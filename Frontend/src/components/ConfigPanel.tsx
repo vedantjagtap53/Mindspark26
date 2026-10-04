@@ -14,7 +14,7 @@ import {
   CPNInputs,
   ProductInputs,
 } from '../api/types';
-import { SAVED_PROFILES, SPOT_PRICES } from '../api/mock';
+import { SPOT_PRICES } from '../api/mock';
 import { Sliders, UserCheck, Play, ChevronDown, ChevronUp, AlertCircle, Sparkles } from 'lucide-react';
 
 interface ConfigPanelProps {
@@ -52,8 +52,17 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
 
   // Client Profile state
   const [isProfileOpen, setIsProfileOpen] = useState<boolean>(true);
-  const [selectedProfileId, setSelectedProfileId] = useState<string>(SAVED_PROFILES[0].id || 'prof-1');
-  const [profile, setProfile] = useState<ClientProfile>({ ...SAVED_PROFILES[0] });
+  const [selectedProfileId, setSelectedProfileId] = useState<string>('prof-1');
+  const [profile, setProfile] = useState<ClientProfile>({
+    id: 'prof-1',
+    name: 'Seeded Profile',
+    age: 45,
+    riskAppetite: 'Moderate',
+    investmentHorizonMonths: 18,
+    lossTolerancePct: 15,
+    concentrationPct: 18,
+    portfolioValue: 25000000,
+  });
 
   // ELN state
   const [elnInputs, setElnInputs] = useState<ELNInputs>({
@@ -99,10 +108,6 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
 
   const handleProfileSelect = (id: string) => {
     setSelectedProfileId(id);
-    const found = SAVED_PROFILES.find((p) => p.id === id);
-    if (found) {
-      setProfile({ ...found });
-    }
   };
 
   const formatTenorApprox = (days: number) => {
@@ -615,7 +620,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
               onChange={(e) => handleProfileSelect(e.target.value)}
               className="w-full bg-transparent px-2 py-1 text-xs focus:outline-none cursor-pointer"
             >
-              {SAVED_PROFILES.map((p) => (
+              {[profile].map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>

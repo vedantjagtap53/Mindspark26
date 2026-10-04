@@ -33,36 +33,15 @@ export const SPOT_PRICES: Record<string, number> = {
   'GBP/USD': 1.3025,
 };
 
-// Seeded Client Profiles for Relationship Managers
-export const SAVED_PROFILES: ClientProfile[] = [
-  {
-    id: 'prof-1',
-    name: 'Vikram Singhania (Family Office - Conservative)',
-    riskAppetite: 'Conservative',
-    investmentHorizonMonths: 12,
-    lossTolerancePct: 5,
-    concentrationPct: 8,
-    portfolioValue: 50000000, // INR 5 Cr
-  },
-  {
-    id: 'prof-2',
-    name: 'Aarav & Sunita Mehta (HNI - Balanced)',
-    riskAppetite: 'Moderate',
-    investmentHorizonMonths: 18,
-    lossTolerancePct: 15,
-    concentrationPct: 18,
-    portfolioValue: 25000000, // INR 2.5 Cr
-  },
-  {
-    id: 'prof-3',
-    name: 'Devika Birla (Growth Mandate - Aggressive)',
-    riskAppetite: 'Aggressive',
-    investmentHorizonMonths: 24,
-    lossTolerancePct: 25,
-    concentrationPct: 22,
-    portfolioValue: 80000000, // INR 8 Cr
-  },
-];
+const DUMMY_PROFILE: ClientProfile = {
+  name: 'Seeded Profile',
+  age: 45,
+  riskAppetite: 'Moderate',
+  investmentHorizonMonths: 18,
+  lossTolerancePct: 15,
+  concentrationPct: 18,
+  portfolioValue: 25000000, // INR 2.5 Cr
+};
 
 // Helper to simulate asynchronous processing latency
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -642,7 +621,7 @@ export const SEEDED_SAVED_SIMULATIONS: SavedSimulationRecord[] = [
         couponPctPa: 9.5,
         barrierType: 'European',
       },
-      profile: SAVED_PROFILES[1],
+      profile: DUMMY_PROFILE,
       headlineRange: 'Base +4.7%, likely range -14.2% to +4.7%',
       cases: {
         low: { scenarioLabel: 'Low Case (P5)', underlyingPctChange: -18.0, underlyingLevel: 20602.09, payoffAmount: 2167500, returnPct: -13.3, knockedIn: true },
@@ -724,7 +703,7 @@ export const SEEDED_SAVED_SIMULATIONS: SavedSimulationRecord[] = [
         participationPct: 75,
         capPct: 125,
       },
-      profile: SAVED_PROFILES[0],
+      profile: DUMMY_PROFILE,
       headlineRange: 'Base +3.8%, likely range 0.0% to +14.6%',
       cases: {
         low: { scenarioLabel: 'Low Case (P5)', underlyingPctChange: -19.2, underlyingLevel: 20300.50, payoffAmount: 10000000, returnPct: 0.0, knockedIn: false },
@@ -803,7 +782,7 @@ export const SEEDED_SAVED_SIMULATIONS: SavedSimulationRecord[] = [
         strikeRate: 84.10,
         enhancedRatePctPa: 8.5,
       },
-      profile: SAVED_PROFILES[0],
+      profile: DUMMY_PROFILE,
       headlineRange: 'Manual Shock Terminal Return: -6.4%',
       cases: {
         low: { scenarioLabel: 'Stressed Shock (-20%)', underlyingPctChange: -4.8, underlyingLevel: 88.30, payoffAmount: 476217, returnPct: -4.8, knockedIn: true },

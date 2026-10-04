@@ -11,7 +11,6 @@ import {
 import type { ProductType } from '../state/forms';
 
 export type Stage = 'MANDATE' | 'STRUCTURE' | 'SIMULATE' | 'OUTCOMES' | 'VERDICT';
-export type Theme = 'executive' | 'midnight' | 'sand' | 'emerald';
 
 export const STAGES: Array<{ id: Stage; label: string; icon: typeof Compass }> = [
   { id: 'MANDATE', label: '1. Mandate', icon: Compass },
@@ -21,20 +20,13 @@ export const STAGES: Array<{ id: Stage; label: string; icon: typeof Compass }> =
   { id: 'VERDICT', label: '5. Verdict', icon: FileCheck },
 ];
 
-const THEMES: Array<{ id: Theme; label: string }> = [
-  { id: 'executive', label: 'Executive Slate' },
-  { id: 'midnight', label: 'Midnight Dark' },
-  { id: 'sand', label: 'Pale Sand' },
-  { id: 'emerald', label: 'Forest Emerald' },
-];
+
 
 interface Props {
   stage: Stage;
   onStage: (s: Stage) => void;
   product: ProductType;
   onProduct: (p: ProductType) => void;
-  theme: Theme;
-  onTheme: (t: Theme) => void;
   runCount: number;
   onOpenRuns: () => void;
   /** Absent when there is no result to print. */
@@ -48,8 +40,6 @@ export function TopNav({
   onStage,
   product,
   onProduct,
-  theme,
-  onTheme,
   runCount,
   onOpenRuns,
   onPrint,
@@ -61,7 +51,7 @@ export function TopNav({
       <div className="max-w-6xl mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center gap-3 justify-between">
         <div>
           <span className="font-serif text-lg font-bold text-[var(--ink-primary)]">
-            Payoff Desk
+            FinStrukt
           </span>
           <span className="block text-[11px] font-mono text-[var(--ink-muted)]">
             Structured products suitability simulator
@@ -88,39 +78,7 @@ export function TopNav({
         </nav>
 
         <div className="flex items-center gap-2">
-          <div role="radiogroup" aria-label="Product" className="flex gap-1">
-            {(['ELN', 'DCD', 'CPN'] as const).map((p) => (
-              <button
-                key={p}
-                type="button"
-                role="radio"
-                aria-checked={product === p}
-                onClick={() => onProduct(p)}
-                className={`px-2 py-1 rounded-md text-xs font-mono font-bold ${
-                  product === p
-                    ? 'bg-[var(--accent-primary)] text-[var(--accent-text)]'
-                    : 'bg-[var(--well-bg)] text-[var(--ink-secondary)]'
-                }`}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-          <label className="sr-only" htmlFor="theme-select">
-            Theme
-          </label>
-          <select
-            id="theme-select"
-            value={theme}
-            onChange={(e) => onTheme(e.target.value as Theme)}
-            className="clay-inset px-2 py-1 text-xs text-[var(--ink-primary)]"
-          >
-            {THEMES.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
-              </option>
-            ))}
-          </select>
+
           {loading && (
             <span
               role="status"

@@ -2,7 +2,7 @@
 import { Compass } from 'lucide-react';
 import type { ProfileForm, RiskAppetite } from '../../state/forms';
 import { Field, Segmented, TextInput, Tile } from '../ui';
-import { SavedProfiles } from './SavedProfiles';
+
 
 interface Props {
   profile: ProfileForm;
@@ -75,7 +75,7 @@ export function ClientProfileForm({ profile, onChange }: Props) {
         </div>
       </div>
 
-      <SavedProfiles profile={profile} onChange={onChange} />
+
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Client reference" htmlFor="client-ref" hint="Internal reference, not a name.">

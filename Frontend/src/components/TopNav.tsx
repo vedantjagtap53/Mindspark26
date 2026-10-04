@@ -6,7 +6,7 @@
 
 import React, { useState } from 'react';
 import { ProductType } from '../api/types';
-import { SAVED_PROFILES } from '../api/mock';
+
 import {
   Activity,
   History,
@@ -28,16 +28,13 @@ export type AppTheme = 'executive' | 'midnight' | 'sand' | 'emerald';
 interface TopNavProps {
   activeStage: JourneyStage;
   onSelectStage: (stage: JourneyStage) => void;
-  activeProduct: ProductType;
-  onSelectProduct: (p: ProductType) => void;
   onOpenSavedModal: () => void;
   onPrintMemo: () => void;
   onRunSimulation: () => void;
   loading: boolean;
   elapsedSeconds: number;
   savedCount: number;
-  selectedProfileId: string;
-  onSelectProfile: (id: string) => void;
+  maxAllowedStageIndex: number;
   theme: AppTheme;
   onSelectTheme: (theme: AppTheme) => void;
 }
@@ -51,8 +48,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   loading,
   elapsedSeconds,
   savedCount,
-  selectedProfileId,
-  onSelectProfile,
+  maxAllowedStageIndex,
   theme,
   onSelectTheme,
 }) => {
@@ -97,18 +93,22 @@ export const TopNav: React.FC<TopNavProps> = ({
 
       {/* Center: Interactive Advisory Journey Stepper */}
       <nav className="flex items-center p-1 bg-[var(--well-bg)] rounded-xl border border-[var(--border-color)] shadow-inner gap-0.5 sm:gap-1 overflow-x-auto max-w-full">
-        {stages.map((st) => {
+        {stages.map((st, i) => {
           const isActive = activeStage === st.id;
+          const isDisabled = i > maxAllowedStageIndex;
           const Icon = st.icon;
 
           return (
             <button
               key={st.id}
+              disabled={isDisabled}
               onClick={() => onSelectStage(st.id)}
-              className={`px-2 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+              className={`px-2 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 flex items-center gap-1.5 whitespace-nowrap ${
                 isActive
-                  ? 'bg-[var(--accent-primary)] text-[var(--accent-text)] shadow-xs font-bold'
-                  : 'text-[var(--ink-secondary)] hover:text-[var(--ink-primary)] hover:bg-white/40'
+                  ? 'bg-[var(--accent-primary)] text-[var(--accent-text)] shadow-xs font-bold cursor-default'
+                  : isDisabled
+                  ? 'text-[var(--ink-muted)] opacity-50 cursor-not-allowed'
+                  : 'text-[var(--ink-secondary)] hover:text-[var(--ink-primary)] hover:bg-white/40 cursor-pointer'
               }`}
             >
               <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[var(--accent-gold)]' : 'text-[var(--ink-muted)]'}`} />
@@ -178,22 +178,6 @@ export const TopNav: React.FC<TopNavProps> = ({
           )}
         </div>
 
-        {/* Client Selector Dropdown */}
-        <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--well-bg)] border border-[var(--border-color)] text-xs shadow-inner">
-          <User className="w-3.5 h-3.5 text-[var(--ink-muted)]" />
-          <span className="text-[var(--ink-muted)] font-medium text-[11px]">Client:</span>
-          <select
-            value={selectedProfileId}
-            onChange={(e) => onSelectProfile(e.target.value)}
-            className="bg-transparent font-semibold text-[var(--ink-primary)] focus:outline-none cursor-pointer text-xs"
-          >
-            {SAVED_PROFILES.map((p) => (
-              <option key={p.id} value={p.id} className="bg-[var(--card-bg)] text-[var(--ink-primary)]">
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
 
         {/* Audit Archive Trigger */}
         <button

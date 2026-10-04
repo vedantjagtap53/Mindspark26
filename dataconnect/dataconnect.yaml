@@ -3,7 +3,7 @@
 # FIREBASE_SQL_CONNECT_LOCATION in .env. The values below are placeholders:
 # the Firebase project, region and Cloud SQL instance have not been chosen yet.
 specVersion: 'v1'
-serviceId: 'finstruct-service'
+serviceId: 'finstrukt-service'
 location: 'asia-southeast1'
 schema:
   source: './schema'

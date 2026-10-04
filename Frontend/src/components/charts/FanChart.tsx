@@ -23,8 +23,8 @@ export const FanChart: React.FC<FanChartProps> = ({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [hoveredPoint, setHoveredPoint] = useState<FanPoint | null>(null);
   const [crosshairPos, setCrosshairPos] = useState<{ x: number; y: number } | null>(null);
-  const clipId = useId();
-  const fanGradId = useId();
+  const clipId = useId().replace(/:/g, '');
+  const fanGradId = useId().replace(/:/g, '');
 
   if (!fan || fan.length === 0) {
     return null;

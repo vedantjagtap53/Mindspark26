@@ -17,7 +17,6 @@ import {
 import {
   runSimulation,
   SEEDED_SAVED_SIMULATIONS,
-  SAVED_PROFILES,
 } from './api/mock';
 import { TopNav, JourneyStage, AppTheme } from './components/TopNav';
 import { BentoWorkspace } from './components/BentoWorkspace';
@@ -38,8 +37,25 @@ export default function App() {
   const [printResult, setPrintResult] = useState<SimulationResult | null>(null);
 
   // Active Client Profile
-  const [selectedProfileId, setSelectedProfileId] = useState<string>(SAVED_PROFILES[1].id || 'prof-2');
-  const [profile, setProfile] = useState<ClientProfile>({ ...SAVED_PROFILES[1] });
+  const [profile, setProfile] = useState<ClientProfile>({
+    name: '',
+    age: '',
+    riskAppetite: 'Moderate',
+    investmentHorizonMonths: 12,
+    lossTolerancePct: 15,
+    concentrationPct: 20,
+    portfolioValue: 10000000,
+  });
+
+  const [maxAllowedStageIndex, setMaxAllowedStageIndex] = useState<number>(0);
+
+  const handleSelectStage = (stage: JourneyStage) => {
+    const idx = ['MANDATE', 'CONFIG', 'SIMULATION', 'OUTCOMES', 'DELIVERY', 'COCKPIT'].indexOf(stage);
+    if (idx > maxAllowedStageIndex && stage !== 'COCKPIT') {
+      setMaxAllowedStageIndex(idx);
+    }
+    setActiveStage(stage);
+  };
 
   // Execution & Latency state
   const [loading, setLoading] = useState<boolean>(false);
@@ -48,14 +64,7 @@ export default function App() {
 
   const timerRef = useRef<number | null>(null);
 
-  // Sync profile when selection changes
-  const handleSelectProfile = (id: string) => {
-    setSelectedProfileId(id);
-    const found = SAVED_PROFILES.find((p) => p.id === id);
-    if (found) {
-      setProfile({ ...found });
-    }
-  };
+
 
   // Initial simulation on mount
   useEffect(() => {
@@ -63,7 +72,6 @@ export default function App() {
       setLoading(true);
       startTimer();
       try {
-        const defaultProfile = SAVED_PROFILES[1];
         const defaultInputs: ProductInputs = {
           underlying: 'NIFTY 50',
           currency: 'INR',
@@ -74,7 +82,7 @@ export default function App() {
           couponPctPa: 9.5,
           barrierType: 'European',
         };
-        const initialRes = await runSimulation('ELN', 'FORECAST', defaultInputs, defaultProfile);
+        const initialRes = await runSimulation('ELN', 'FORECAST', defaultInputs, profile);
         setResult(initialRes);
       } catch (err: any) {
         setErrorState({ hasError: true, message: err?.message || 'Execution error.' });
@@ -170,12 +178,7 @@ export default function App() {
       {/* Unified Enterprise Top Navigation Header */}
       <TopNav
         activeStage={activeStage}
-        onSelectStage={setActiveStage}
-        activeProduct={activeProduct}
-        onSelectProduct={(p) => {
-          setActiveProduct(p);
-          setErrorState(null);
-        }}
+        onSelectStage={handleSelectStage}
         onOpenSavedModal={() => setIsSavedModalOpen(true)}
         onPrintMemo={() => {
           if (result) setPrintResult(result);
@@ -193,8 +196,7 @@ export default function App() {
         loading={loading}
         elapsedSeconds={elapsedSeconds}
         savedCount={savedSimulations.length}
-        selectedProfileId={selectedProfileId}
-        onSelectProfile={handleSelectProfile}
+        maxAllowedStageIndex={maxAllowedStageIndex}
         theme={theme}
         onSelectTheme={setTheme}
       />
@@ -224,7 +226,7 @@ export default function App() {
         ) : (
           <BentoWorkspace
             activeStage={activeStage}
-            onSelectStage={setActiveStage}
+            onSelectStage={handleSelectStage}
             product={activeProduct}
             onSelectProduct={(p) => {
               setActiveProduct(p);

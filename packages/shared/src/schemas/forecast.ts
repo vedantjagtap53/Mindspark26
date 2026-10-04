@@ -28,7 +28,8 @@ export const forecastRequestSchema = z.object({
   }),
   tenorDays: z.number().int().min(TENOR_DAYS_MIN).max(TENOR_DAYS_MAX),
   trainingWindowYears: z
-    .union([z.literal(5), z.literal(10)])
+    .number()
+    .positive()
     .default(DEFAULT_TRAINING_WINDOW_YEARS),
   samplePathCount: z
     .number()
