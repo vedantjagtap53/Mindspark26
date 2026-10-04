@@ -5,7 +5,8 @@ import { ErrorBlock } from './components/ErrorBlock';
 import { PrintReport } from './components/PrintReport';
 import { SessionRunsModal } from './components/SessionRunsModal';
 import { StageHeader } from './components/StageHeader';
-import { TopNav, type Stage, type Theme } from './components/TopNav';
+import { TopNav, type Stage } from './components/TopNav';
+import { LandingPage } from './pages/LandingPage';
 import { useSimulation } from './hooks/useSimulation';
 import { MandatePage } from './pages/MandatePage';
 import { OutcomesPage } from './pages/OutcomesPage';
@@ -26,7 +27,7 @@ import {
 import type { SessionRun } from './types/session';
 
 export function App() {
-  const [theme, setTheme] = useState<Theme>('executive');
+  const [started, setStarted] = useState(false);
   const [stage, setStage] = useState<Stage>('MANDATE');
   const [product, setProductState] = useState<ProductType>('ELN');
   const [forms, setForms] = useState<Forms>(DEFAULT_FORMS);
@@ -57,9 +58,12 @@ export function App() {
     setStage('OUTCOMES');
   };
 
+  if (!started) {
+    return <LandingPage onStart={() => setStarted(true)} />;
+  }
+
   return (
     <div
-      data-theme={theme}
       className="min-h-screen bg-[var(--canvas-bg)] text-[var(--canvas-text)] font-sans flex flex-col antialiased transition-colors duration-200"
     >
       <CustomCursor />
@@ -68,8 +72,6 @@ export function App() {
         onStage={setStage}
         product={product}
         onProduct={setProduct}
-        theme={theme}
-        onTheme={setTheme}
         runCount={sim.runs.length}
         onOpenRuns={() => setRunsOpen(true)}
         onPrint={current ? () => setPrintRun(current) : undefined}

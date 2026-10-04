@@ -50,7 +50,7 @@ class ForecastService:
     def _fit(self, window_years):
         key = (self.as_of, window_years)
         if key not in self._fits:
-            d = self.df[self.df.Date >= self.df.Date.max() - pd.DateOffset(years=window_years)]
+            d = self.df[self.df.Date >= self.df.Date.max() - pd.DateOffset(days=int(window_years * 365.25))]
             lr = (np.log(d.Close).diff().dropna() * 100).values
             try:
                 p = nm.fit_garch(lr)
@@ -70,8 +70,8 @@ class ForecastService:
             raise ApiError(400, "UNSUPPORTED_UNDERLYING", f"Underlying {underlying!r} is not supported")
         if not (c["min_tenor"] <= tenor_days <= c["max_tenor"]):
             raise ApiError(422, "INVALID_REQUEST", f"tenorDays must be between {c['min_tenor']} and {c['max_tenor']}")
-        if not (3 <= training_window_years <= 10):
-            raise ApiError(422, "INVALID_REQUEST", "trainingWindowYears must be between 3 and 10")
+        if not (0.08 <= training_window_years <= 10):
+            raise ApiError(422, "INVALID_REQUEST", "trainingWindowYears must be between 0.08 and 10")
         if not (0 <= n_sample_paths <= 1000):
             raise ApiError(422, "INVALID_REQUEST", "nSamplePaths must be between 0 and 1000")
         if (_today() - self.as_of).days > c["stale_days"]:

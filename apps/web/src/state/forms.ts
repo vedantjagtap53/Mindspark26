@@ -56,7 +56,7 @@ export interface RunSettings {
   levelSource: LevelSourceChoice;
   /** RM-entered starting level (S_0, or FX spot for DCD); null until entered. */
   manualLevel: number | null;
-  trainingWindowYears: 5 | 10;
+  trainingWindowDays: number;
 }
 
 export interface Forms {
@@ -120,7 +120,7 @@ export const DEFAULT_RUN: RunSettings = {
   shockPct: -10,
   levelSource: 'manual',
   manualLevel: null,
-  trainingWindowYears: 10,
+  trainingWindowDays: 3650,
 };
 
 /** The `terms` object exactly as POST /api/configure and /api/simulate expect it. */
@@ -198,7 +198,7 @@ export function runSettingsFor(from: ProductType, to: ProductType, run: RunSetti
 export function simulateRequest(product: ProductType, forms: Forms, run: RunSettings) {
   const terms = termsFor(product, forms);
   if (run.mode === 'A') {
-    return { mode: 'A', productType: product, terms, trainingWindowYears: run.trainingWindowYears };
+    return { mode: 'A', productType: product, terms, trainingWindowYears: run.trainingWindowDays / 365 };
   }
   const level =
     run.levelSource === 'manual'

@@ -46,6 +46,7 @@ export type ProductInputs = ELNInputs | DCDInputs | CPNInputs;
 export interface ClientProfile {
   id?: string;
   name: string;
+  age?: number | '';
   riskAppetite: RiskAppetite;
   investmentHorizonMonths: number;
   lossTolerancePct: number; // % of notional client can tolerate losing

@@ -19,7 +19,7 @@ import {
   ChatMessage,
   RiskAppetite,
 } from '../api/types';
-import { SPOT_PRICES, getMockChatReply, SAVED_PROFILES } from '../api/mock';
+import { SPOT_PRICES, getMockChatReply } from '../api/mock';
 import { PayoffChart } from './charts/PayoffChart';
 import { FanChart } from './charts/FanChart';
 import { JourneyStage } from './TopNav';
@@ -81,7 +81,7 @@ export const BentoWorkspace: React.FC<BentoWorkspaceProps> = ({
 }) => {
   // Mode selection & calibration
   const [mode, setMode] = useState<SimMode>('FORECAST');
-  const [trainingWindowYears, setTrainingWindowYears] = useState<number>(10);
+  const [trainingWindowDays, setTrainingWindowDays] = useState<number>(1095);
   const [shockPct, setShockPct] = useState<number>(-10);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
 
@@ -135,10 +135,19 @@ export const BentoWorkspace: React.FC<BentoWorkspaceProps> = ({
     return cpnInputs;
   };
 
+  const endDate = new Date('2026-10-03');
+  const startDate = new Date(endDate.getTime() - trainingWindowDays * 24 * 60 * 60 * 1000);
+  const trainingWindowStart = startDate.toISOString().split('T')[0];
+  const trainingWindowEnd = endDate.toISOString().split('T')[0];
+
   const handleExecuteSimulation = () => {
     const inputs = getCurrentInputs();
+    
+    // Calculate approximate years from the date range for the backend API
+    const computedYears = Math.max(30 / 365, trainingWindowDays / 365);
+
     onRunSimulation(inputs, profile, mode, {
-      trainingWindowYears,
+      trainingWindowYears: computedYears,
       shockPct,
       forceFailure: false,
       isStaleData: false,
@@ -320,25 +329,9 @@ export const BentoWorkspace: React.FC<BentoWorkspaceProps> = ({
                   </div>
                 </div>
 
-                {/* Preset Profiles Picker */}
-                <div className="flex items-center gap-1">
-                  {SAVED_PROFILES.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => onUpdateProfile({ ...p })}
-                      className={`px-2 py-1 rounded-lg text-[11px] font-semibold cursor-pointer transition-all ${
-                        profile.id === p.id
-                          ? 'bg-[var(--accent-primary)] text-[var(--accent-text)] shadow-xs'
-                          : 'bg-[var(--well-bg)] text-[var(--ink-secondary)] hover:bg-[var(--well-deep)]'
-                      }`}
-                    >
-                      {p.name.split(' ')[0]}
-                    </button>
-                  ))}
-                </div>
               </div>
 
-              {/* Client Name & Risk Category */}
+              {/* Client Name & Age */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] font-mono text-[var(--ink-muted)] font-semibold block mb-1">
@@ -354,24 +347,36 @@ export const BentoWorkspace: React.FC<BentoWorkspaceProps> = ({
 
                 <div>
                   <label className="text-[11px] font-mono text-[var(--ink-muted)] font-semibold block mb-1">
-                    RISK APPETITE CATEGORY
+                    CLIENT AGE
                   </label>
-                  <div className="flex gap-1.5 p-1 bg-[var(--well-bg)] rounded-xl border border-[var(--border-color)]">
-                    {(['Conservative', 'Moderate', 'Aggressive'] as RiskAppetite[]).map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => onUpdateProfile({ ...profile, riskAppetite: cat })}
-                        className={`flex-1 py-1 text-center rounded-lg text-xs font-semibold cursor-pointer transition-all ${
-                          profile.riskAppetite === cat
-                            ? 'bg-[var(--accent-primary)] text-[var(--accent-text)] shadow-xs'
-                            : 'text-[var(--ink-secondary)] hover:text-[var(--ink-primary)]'
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
+                  <input
+                    type="number"
+                    value={profile.age ?? ''}
+                    onChange={(e) => onUpdateProfile({ ...profile, age: e.target.value ? Number(e.target.value) : '' })}
+                    className="clay-inset w-full px-3 py-2 text-xs font-semibold text-[var(--ink-primary)] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-mono text-[var(--ink-muted)] font-semibold block mb-1 mt-2">
+                  RISK APPETITE CATEGORY
+                </label>
+                <div className="flex gap-1.5 p-1 bg-[var(--well-bg)] rounded-xl border border-[var(--border-color)]">
+                  {(['Conservative', 'Moderate', 'Aggressive'] as RiskAppetite[]).map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => onUpdateProfile({ ...profile, riskAppetite: cat })}
+                      className={`flex-1 py-1 text-center rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+                        profile.riskAppetite === cat
+                          ? 'bg-[var(--accent-primary)] text-[var(--accent-text)] shadow-xs'
+                          : 'text-[var(--ink-secondary)] hover:text-[var(--ink-primary)]'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -592,7 +597,8 @@ export const BentoWorkspace: React.FC<BentoWorkspaceProps> = ({
                 <div className="pt-2 border-t border-[var(--border-color)] flex justify-end">
                   <button
                     onClick={goToNextStage}
-                    className="clay-btn-primary w-full py-2.5 px-4 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                    disabled={!profile.name || profile.age === '' || Number(profile.age) <= 0}
+                    className="clay-btn-primary w-full py-2.5 px-4 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <span>Confirm Mandate & Structure Note</span>
                     <ArrowRight className="w-4 h-4" />
@@ -609,77 +615,7 @@ export const BentoWorkspace: React.FC<BentoWorkspaceProps> = ({
       {/* ========================================================================= */}
       {(activeStage === 'CONFIG' || activeStage === 'COCKPIT') && (
         <div className="space-y-4 animate-journey-step">
-          {/* Top Product Selector Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-            <button
-              onClick={() => onSelectProduct('ELN')}
-              className={`p-4 rounded-2xl text-left cursor-pointer transition-all ${
-                product === 'ELN'
-                  ? 'clay-tile border-[var(--border-strong)] shadow-md ring-2 ring-[var(--accent-primary)]/20'
-                  : 'bg-[var(--card-bg)]/70 border border-[var(--border-color)] hover:bg-[var(--card-bg)]'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-[var(--accent-primary)] text-[var(--accent-text)]">
-                  ELN
-                </span>
-                {product === 'ELN' && <CheckCircle2 className="w-4 h-4 text-[var(--status-suitable-text)]" />}
-              </div>
-              <h3 className="font-serif text-sm font-bold text-[var(--ink-primary)]">
-                Equity Linked Note (Reverse Convertible)
-              </h3>
-              <p className="text-[11px] text-[var(--ink-muted)] mt-1 leading-snug">
-                Enhanced coupon yield ({elnInputs.couponPctPa}% p.a.) backed by downside barrier
-                protection.
-              </p>
-            </button>
 
-            <button
-              onClick={() => onSelectProduct('DCD')}
-              className={`p-4 rounded-2xl text-left cursor-pointer transition-all ${
-                product === 'DCD'
-                  ? 'clay-tile border-[var(--border-strong)] shadow-md ring-2 ring-[var(--accent-primary)]/20'
-                  : 'bg-[var(--card-bg)]/70 border border-[var(--border-color)] hover:bg-[var(--card-bg)]'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-[var(--accent-primary)] text-[var(--accent-text)]">
-                  DCD
-                </span>
-                {product === 'DCD' && <CheckCircle2 className="w-4 h-4 text-[var(--status-suitable-text)]" />}
-              </div>
-              <h3 className="font-serif text-sm font-bold text-[var(--ink-primary)]">
-                Dual Currency Deposit (FX Yield Booster)
-              </h3>
-              <p className="text-[11px] text-[var(--ink-muted)] mt-1 leading-snug">
-                High short-term deposit yield ({dcdInputs.enhancedRatePctPa}% p.a.) with FX conversion
-                at strike.
-              </p>
-            </button>
-
-            <button
-              onClick={() => onSelectProduct('CPN')}
-              className={`p-4 rounded-2xl text-left cursor-pointer transition-all ${
-                product === 'CPN'
-                  ? 'clay-tile border-[var(--border-strong)] shadow-md ring-2 ring-[var(--accent-primary)]/20'
-                  : 'bg-[var(--card-bg)]/70 border border-[var(--border-color)] hover:bg-[var(--card-bg)]'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-[var(--accent-primary)] text-[var(--accent-text)]">
-                  CPN
-                </span>
-                {product === 'CPN' && <CheckCircle2 className="w-4 h-4 text-[var(--status-suitable-text)]" />}
-              </div>
-              <h3 className="font-serif text-sm font-bold text-[var(--ink-primary)]">
-                Capital Protected Note (Guaranteed Floor)
-              </h3>
-              <p className="text-[11px] text-[var(--ink-muted)] mt-1 leading-snug">
-                100% principal protection floor + {cpnInputs.participationPct}% upside market
-                participation.
-              </p>
-            </button>
-          </div>
 
           {/* Interactive Structuring Sliders & Plain-English Explainer */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
@@ -692,9 +628,20 @@ export const BentoWorkspace: React.FC<BentoWorkspaceProps> = ({
                     Structure Note Parameters
                   </h3>
                 </div>
-                <span className="text-[11px] font-mono text-[var(--ink-muted)]">
-                  SPOT: ₹{SPOT_PRICES['NIFTY 50'].toLocaleString()}
-                </span>
+                <div className="flex items-center gap-3">
+                  <select
+                    value={product}
+                    onChange={(e) => onSelectProduct(e.target.value as ProductType)}
+                    className="clay-inset px-3 py-1 text-xs font-semibold text-[var(--ink-primary)] focus:outline-none"
+                  >
+                    <option value="ELN">ELN (Reverse Convertible)</option>
+                    <option value="DCD">DCD (Dual Currency Deposit)</option>
+                    <option value="CPN">CPN (Capital Protected Note)</option>
+                  </select>
+                  <span className="text-[11px] font-mono text-[var(--ink-muted)] hidden sm:inline">
+                    SPOT: ₹{SPOT_PRICES['NIFTY 50'].toLocaleString()}
+                  </span>
+                </div>
               </div>
 
               {/* Dynamic Inputs based on product */}
@@ -711,9 +658,6 @@ export const BentoWorkspace: React.FC<BentoWorkspaceProps> = ({
                         className="clay-inset w-full px-3 py-2 text-xs font-semibold text-[var(--ink-primary)] focus:outline-none"
                       >
                         <option value="NIFTY 50">NIFTY 50 (Index)</option>
-                        <option value="BANKNIFTY">BANKNIFTY (Banking)</option>
-                        <option value="RELIANCE">RELIANCE (Energy/Tech)</option>
-                        <option value="TCS">TCS (IT Services)</option>
                       </select>
                     </div>
 
@@ -1130,27 +1074,41 @@ export const BentoWorkspace: React.FC<BentoWorkspaceProps> = ({
               </div>
             </div>
 
+            {/* Simulation Configuration Summary */}
+            <div className="p-3 bg-[var(--well-bg)] border border-[var(--border-color)] rounded-xl flex items-center gap-4 text-xs mb-4">
+              <span className="font-semibold text-[var(--ink-primary)]">Simulation Target:</span>
+              <span className="text-[var(--ink-secondary)]">Product: <strong className="text-[var(--ink-primary)]">{product}</strong></span>
+              {product === 'DCD' ? (
+                <span className="text-[var(--ink-secondary)]">Currency Pair: <strong className="text-[var(--ink-primary)]">{dcdInputs.currencyPair}</strong></span>
+              ) : (
+                <span className="text-[var(--ink-secondary)]">Underlying: <strong className="text-[var(--ink-primary)]">{(getCurrentInputs() as (ELNInputs | CPNInputs)).underlying}</strong></span>
+              )}
+            </div>
+
             {/* Calibration Controls */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-3.5 rounded-xl clay-tile-light border border-[var(--border-subtle)]">
-                <label className="text-[11px] font-mono text-[var(--ink-muted)] font-semibold block mb-1">
-                  HISTORICAL TRAINING WINDOW
-                </label>
-                <div className="flex gap-1.5">
-                  {[3, 5, 10].map((yr) => (
-                    <button
-                      key={yr}
-                      type="button"
-                      onClick={() => setTrainingWindowYears(yr)}
-                      className={`flex-1 py-1.5 rounded-lg text-xs font-mono font-semibold cursor-pointer ${
-                        trainingWindowYears === yr
-                          ? 'bg-[var(--accent-primary)] text-[var(--accent-text)]'
-                          : 'bg-[var(--well-bg)] text-[var(--ink-secondary)]'
-                      }`}
-                    >
-                      {yr} Years
-                    </button>
-                  ))}
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="font-mono text-[var(--ink-muted)] font-semibold">
+                    HISTORICAL TRAINING WINDOW
+                  </span>
+                  <span className="font-bold text-[var(--ink-primary)]">
+                    {trainingWindowDays} Days
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="30"
+                  max="1095"
+                  step="1"
+                  value={trainingWindowDays}
+                  onChange={(e) => setTrainingWindowDays(Number(e.target.value))}
+                  className="w-full accent-[var(--accent-primary)] cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-[var(--ink-muted)] font-mono">
+                  <span>1 Month</span>
+                  <span>1.5 Yrs</span>
+                  <span>3 Yrs</span>
                 </div>
                 <span className="text-[10px] text-[var(--ink-muted)] mt-1.5 block">
                   Calibrated to empirical NIFTY drift & GARCH(1,1) volatility.
@@ -1450,6 +1408,34 @@ export const BentoWorkspace: React.FC<BentoWorkspaceProps> = ({
                   <Printer className="w-3.5 h-3.5" />
                   <span>Download / Print Memorandum</span>
                 </button>
+              </div>
+            </div>
+
+            {/* Client & Configuration Summary */}
+            <div className="p-4 bg-[var(--well-bg)] border border-[var(--border-color)] rounded-xl flex flex-wrap gap-6 text-xs">
+              <div className="flex flex-col">
+                <span className="font-mono text-[10px] text-[var(--ink-muted)] mb-1">CLIENT NAME</span>
+                <strong className="text-[var(--ink-primary)] text-sm">{profile.name}</strong>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-mono text-[10px] text-[var(--ink-muted)] mb-1">AGE</span>
+                <strong className="text-[var(--ink-primary)] text-sm">{profile.age || 'N/A'}</strong>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-mono text-[10px] text-[var(--ink-muted)] mb-1">TARGET PRODUCT</span>
+                <strong className="text-[var(--ink-primary)] text-sm">{product}</strong>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-mono text-[10px] text-[var(--ink-muted)] mb-1">
+                  {product === 'DCD' ? 'CURRENCY PAIR' : 'UNDERLYING'}
+                </span>
+                <strong className="text-[var(--ink-primary)] text-sm">
+                  {product === 'DCD' ? dcdInputs.currencyPair : (getCurrentInputs() as (ELNInputs | CPNInputs)).underlying}
+                </strong>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-mono text-[10px] text-[var(--ink-muted)] mb-1">TRAINING WINDOW</span>
+                <strong className="text-[var(--ink-primary)] text-sm">{trainingWindowStart} to {trainingWindowEnd}</strong>
               </div>
             </div>
 

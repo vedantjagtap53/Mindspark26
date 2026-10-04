@@ -21,11 +21,15 @@ async def lifespan(app):
 app = FastAPI(title="Nifty 50 Forecast Service", version="1.0", lifespan=lifespan)
 
 
+class UnderlyingRef(BaseModel):
+    symbol: str
+    assetClass: str
+
 class ForecastRequest(BaseModel):
-    underlying: str
+    underlying: UnderlyingRef
     tenorDays: int
-    trainingWindowYears: Optional[int] = 10
-    nSamplePaths: Optional[int] = 500
+    trainingWindowYears: Optional[float] = 10.0
+    samplePathCount: Optional[int] = 500
 
 
 def _err(status, code, msg):
@@ -50,8 +54,8 @@ async def _internal(_: Request, e: Exception):
 
 @app.post("/v1/forecast")
 def forecast(req: ForecastRequest):
-    return svc.forecast(req.underlying, req.tenorDays, req.trainingWindowYears or 10,
-                        500 if req.nSamplePaths is None else req.nSamplePaths)
+    return svc.forecast(req.underlying.symbol, req.tenorDays, req.trainingWindowYears or 10.0,
+                        500 if req.samplePathCount is None else req.samplePathCount)
 
 
 @app.get("/v1/model-card")
