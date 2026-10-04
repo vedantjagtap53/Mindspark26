@@ -151,18 +151,31 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/** The app opens on the landing page; every journey starts from its button. */
+function renderApp() {
+  render(<App />);
+  fireEvent.click(screen.getAllByRole('button', { name: /Start New Mandate/ })[0]!);
+}
+
 const goToSimulate = () => fireEvent.click(screen.getByRole('button', { name: /3\. Simulate/ }));
 
 describe('Payoff Desk journey', () => {
-  it('starts on the mandate stage with the verdict marked pending', () => {
+  it('opens on the landing page and enters the journey from it', () => {
     render(<App />);
+    expect(screen.queryByRole('heading', { name: /Capture the client mandate/ })).toBeNull();
+    fireEvent.click(screen.getAllByRole('button', { name: /Start New Mandate/ })[0]!);
+    expect(screen.getByRole('heading', { name: /Capture the client mandate/ })).toBeTruthy();
+  });
+
+  it('starts on the mandate stage with the verdict marked pending', () => {
+    renderApp();
     expect(screen.getByRole('heading', { name: /Capture the client mandate/ })).toBeTruthy();
     expect(screen.getByText('Pending')).toBeTruthy();
   });
 
   it('runs Mode B with a manual level and shows the backend payoff', async () => {
     const { fetchMock } = backend();
-    render(<App />);
+    renderApp();
     goToSimulate();
 
     const run = screen.getByRole('button', { name: /Run simulation/ });
@@ -190,7 +203,7 @@ describe('Payoff Desk journey', () => {
 
   it('gets the verdict, an explanation and chat answers from the backend', async () => {
     const { bodies } = backend();
-    render(<App />);
+    renderApp();
     await runModeB();
 
     // The verdict is requested for the run with the profile's four rule fields only.
@@ -239,7 +252,7 @@ describe('Payoff Desk journey', () => {
 
   it('loads a saved profile and links the verdict to it', async () => {
     const { bodies } = backend();
-    render(<App />);
+    renderApp();
     const select = await screen.findByLabelText('Saved profile');
     await screen.findByRole('option', { name: /CL-0042/ });
     fireEvent.change(select, { target: { value: savedProfiles[0]!.id } });
@@ -278,7 +291,7 @@ describe('Payoff Desk journey', () => {
       }
       return json(200, { profiles: [] });
     });
-    render(<App />);
+    renderApp();
     fireEvent.change(screen.getByLabelText('Client reference'), { target: { value: 'CL-7' } });
     fireEvent.click(screen.getByRole('button', { name: /^Save profile/ }));
     expect(await screen.findByText('Saved CL-7.')).toBeTruthy();
@@ -291,7 +304,7 @@ describe('Payoff Desk journey', () => {
         error: { code: 'DATABASE_NOT_CONFIGURED', message: 'Saved profiles need the database' },
       }),
     );
-    render(<App />);
+    renderApp();
     expect(await screen.findByText(/DATABASE_NOT_CONFIGURED/)).toBeTruthy();
   });
 
@@ -299,7 +312,7 @@ describe('Payoff Desk journey', () => {
     vi.stubGlobal('fetch', () =>
       json(503, { error: { code: 'AI_UNAVAILABLE', message: 'Forecast service unavailable' } }),
     );
-    render(<App />);
+    renderApp();
     goToSimulate();
     fireEvent.click(screen.getByRole('radio', { name: /Mode A/ }));
     fireEvent.click(screen.getByRole('button', { name: /Run simulation/ }));
@@ -314,7 +327,7 @@ describe('Payoff Desk journey', () => {
 
   it('streams the live price for the underlying over /api/live', async () => {
     vi.stubGlobal('WebSocket', FakeWebSocket);
-    render(<App />);
+    renderApp();
     fireEvent.click(screen.getByRole('button', { name: /2\. Structure/ }));
     fireEvent.change(screen.getByLabelText(/Underlying symbol/), { target: { value: 'AAPL' } });
     goToSimulate();
@@ -341,7 +354,7 @@ describe('Payoff Desk journey', () => {
         },
       }),
     );
-    render(<App />);
+    renderApp();
     goToSimulate();
     fireEvent.click(screen.getByRole('radio', { name: 'Live level' }));
     fireEvent.click(screen.getByRole('button', { name: /Run simulation/ }));
@@ -354,8 +367,10 @@ describe('Payoff Desk journey', () => {
 
   it('offers Mode A for DCD and sends the FX terms to the backend', async () => {
     const { bodies } = backend();
-    render(<App />);
-    fireEvent.click(screen.getByRole('radio', { name: 'DCD' }));
+    renderApp();
+    // The product cards are on the Structure stage.
+    fireEvent.click(screen.getByRole('button', { name: /2\. Structure/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /DCD/ }));
     goToSimulate();
     const modeA = screen.getByRole<HTMLButtonElement>('radio', { name: /Mode A/ });
     expect(modeA.disabled).toBe(false);

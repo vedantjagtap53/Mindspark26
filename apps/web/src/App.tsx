@@ -63,9 +63,7 @@ export function App() {
   }
 
   return (
-    <div
-      className="min-h-screen bg-[var(--canvas-bg)] text-[var(--canvas-text)] font-sans flex flex-col antialiased transition-colors duration-200"
-    >
+    <div className="min-h-screen bg-[var(--canvas-bg)] text-[var(--canvas-text)] font-sans flex flex-col antialiased transition-colors duration-200">
       <CustomCursor />
       <TopNav
         stage={stage}

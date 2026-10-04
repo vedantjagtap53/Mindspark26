@@ -19,8 +19,6 @@ export const STAGES: Array<{ id: Stage; label: string; icon: typeof Compass }> =
   { id: 'VERDICT', label: '5. Verdict', icon: FileCheck },
 ];
 
-
-
 interface Props {
   stage: Stage;
   onStage: (s: Stage) => void;
@@ -45,9 +43,7 @@ export function TopNav({
     <header className="no-print sticky top-0 z-20 border-b border-[var(--border-color)] bg-[var(--canvas-bg)]/95 backdrop-blur">
       <div className="max-w-6xl mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center gap-3 justify-between">
         <div>
-          <span className="font-serif text-lg font-bold text-[var(--ink-primary)]">
-            FinStrukt
-          </span>
+          <span className="font-serif text-lg font-bold text-[var(--ink-primary)]">FinStrukt</span>
           <span className="block text-[11px] font-mono text-[var(--ink-muted)]">
             Structured products suitability simulator
           </span>
@@ -73,7 +69,6 @@ export function TopNav({
         </nav>
 
         <div className="flex items-center gap-2">
-
           {loading && (
             <span
               role="status"
