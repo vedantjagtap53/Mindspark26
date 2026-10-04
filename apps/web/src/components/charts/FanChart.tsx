@@ -1,10 +1,13 @@
-// Mode A forecast fan: P5–P95 band and P50 line per trading day, from the forecast service via the
-// backend. Price history is not shown yet (the market-data history API is not built).
+// Mode A forecast fan: recent daily closes, then the P5–P95 band and P50 line per trading day, from
+// the forecast service via the backend. History is drawn only when the backend matched it to the
+// forecast spot; otherwise the reason is shown and nothing stands in for it.
 import { useId } from 'react';
+import type { PriceHistory } from '@mindspark/shared';
 import { formatLevel } from '../../utils/format';
 
 interface Props {
   fan: { p5: number[]; p50: number[]; p95: number[] };
+  history?: PriceHistory;
   asOf: string;
   lines: Array<{ level: number; label: string; tone: 'strike' | 'barrier' }>;
   cases: Array<{ label: string; terminal: number }>;
@@ -14,12 +17,17 @@ const W = 760;
 const H = 300;
 const M = { top: 20, right: 96, bottom: 40, left: 72 };
 
-export function FanChart({ fan, asOf, lines, cases }: Props) {
+export function FanChart({ fan, history, asOf, lines, cases }: Props) {
   const titleId = useId();
   const n = fan.p50.length;
   if (n < 2) return null;
 
+  // History ends at day 0 (the forecast's as-of close), so it sits at x = −(points − 1) … 0.
+  const past = history?.status === 'ok' ? history.points : [];
+  const h = Math.max(past.length - 1, 0);
+
   const values = [
+    ...past.map((p) => p.close),
     ...fan.p5,
     ...fan.p95,
     ...lines.map((l) => l.level),
@@ -29,7 +37,7 @@ export function FanChart({ fan, asOf, lines, cases }: Props) {
   const yMax = Math.max(...values) * 1.02;
   const pw = W - M.left - M.right;
   const ph = H - M.top - M.bottom;
-  const x = (i: number) => M.left + (i / (n - 1)) * pw;
+  const x = (i: number) => M.left + ((i + h) / (n - 1 + h)) * pw;
   const y = (v: number) => M.top + (1 - (v - yMin) / (yMax - yMin)) * ph;
 
   const upper = fan.p95.map((v, i) => `${i ? 'L' : 'M'}${x(i)},${y(v)}`).join(' ');
@@ -38,6 +46,7 @@ export function FanChart({ fan, asOf, lines, cases }: Props) {
     .map((v, k) => `L${x(n - 1 - k)},${y(v)}`)
     .join(' ');
   const median = fan.p50.map((v, i) => `${i ? 'L' : 'M'}${x(i)},${y(v)}`).join(' ');
+  const historyPath = past.map((p, k) => `${k ? 'L' : 'M'}${x(k - h)},${y(p.close)}`).join(' ');
   const yTicks = Array.from({ length: 5 }, (_, i) => yMin + ((yMax - yMin) * i) / 4);
 
   return (
@@ -66,7 +75,31 @@ export function FanChart({ fan, asOf, lines, cases }: Props) {
             </text>
           </g>
         ))}
-        <path d={`${upper} ${lower} Z`} fill="var(--chart-area-fill)" stroke="none" />
+        {past.length > 1 && (
+          <>
+            <path
+              d={historyPath}
+              fill="none"
+              stroke="var(--ink-secondary)"
+              strokeWidth={1.5}
+              data-testid="fan-history"
+            />
+            <line
+              x1={x(0)}
+              x2={x(0)}
+              y1={M.top}
+              y2={H - M.bottom}
+              stroke="var(--chart-grid-stroke)"
+              strokeDasharray="2 3"
+            />
+          </>
+        )}
+        <path
+          d={`${upper} ${lower} Z`}
+          fill="var(--chart-area-fill)"
+          fillOpacity={0.18}
+          stroke="none"
+        />
         <path d={median} fill="none" stroke="var(--chart-payoff-stroke)" strokeWidth={2} />
         {lines.map((l) => (
           <g key={l.label}>
@@ -101,8 +134,18 @@ export function FanChart({ fan, asOf, lines, cases }: Props) {
           </g>
         ))}
         <text x={M.left} y={H - 8} className="fill-[var(--ink-muted)] text-[11px] font-mono">
-          Day 0 = close of {asOf}
+          {past.length > 1 ? `From ${past[0]!.date}` : `Day 0 = close of ${asOf}`}
         </text>
+        {past.length > 1 && (
+          <text
+            x={x(0)}
+            y={H - 8}
+            textAnchor="middle"
+            className="fill-[var(--ink-muted)] text-[11px] font-mono"
+          >
+            {asOf}
+          </text>
+        )}
         <text
           x={W - M.right}
           y={H - 8}
@@ -114,7 +157,12 @@ export function FanChart({ fan, asOf, lines, cases }: Props) {
       </svg>
       <p className="text-[11px] font-mono text-[var(--ink-muted)]">
         Shaded: 5th–95th percentile of simulated levels. Line: median. Dots: low, base and high case
-        end levels.
+        end levels.{' '}
+        {history?.status === 'ok'
+          ? `Grey line: daily closes from ${history.source} (holidays skipped).`
+          : history
+            ? `Price history not shown: ${history.reason}.`
+            : ''}
       </p>
     </figure>
   );

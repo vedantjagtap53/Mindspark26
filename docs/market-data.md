@@ -27,8 +27,19 @@ Source: `PRD.md` §7.2 and §7.3.
 - **Staleness:** a live price whose last-trade time is older than `MARKET_DATA_MAX_AGE_SECONDS` (default 120) is rejected, so after hours a live request fails and the RM enters the level manually.
 - **FX (DCD):** Frankfurter daily reference rate, `GET /v2/rate/{base}/{quote}`, accepted up to `FX_RATE_MAX_AGE_DAYS` (default 4) old. It is end-of-day and indicative.
 - **Manual:** the RM can always enter the level; it is labelled `manual` and carries no timestamp.
-- **Forecast training data:** `services/forecast/forecast_service/refresh.py` appends Upstox daily candles to the forecast service's CSV (scheduled after the close; see `services/forecast/README.md`).
-- **Not built yet:** daily history for the Mode A chart (backend), live FX from Upstox, other underlyings.
+- **Forecast training data (2026-10-04):** `services/forecast/forecast_service/refresh.py` appends daily Nifty 50 closes to the forecast service's CSV. Default source **Yahoo Finance** (`^NSEI`, chart API, free, no account or key); Upstox remains available with `--source upstox`. Scheduled after the close; see `services/forecast/README.md`.
+- **Daily history for the Mode A fan chart (2026-10-04):** `apps/api/src/services/market-data/history/yahooHistoryProvider.ts`, enabled with `MARKET_HISTORY_PROVIDER=yahoo` (default `none`). FX pairs map to Yahoo's `USDINR=X` form. Fetched alongside the forecast; shown only when its close on the forecast's as-of date is within 0.05% of the forecast spot, so the chart never joins two disagreeing sources. Holidays skipped; nothing stored.
+- **Not built yet:** live FX, other underlyings in the forecast service.
+
+### Free alternatives to Upstox for daily Nifty 50 closes (reviewed 2026-10-04)
+
+| Source                                                                                       | Cost / key             | Notes                                                                                                                                                                                                         |
+| -------------------------------------------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Yahoo Finance chart API** (`query1.finance.yahoo.com/v8/finance/chart/^NSEI`) — **chosen** | Free, no key           | Unofficial and undocumented: no SLA, may rate-limit or change; Yahoo's terms restrict redistribution. Closes match NSE's to 2 dp (float32 noise is rounded). Also used by the open-source `yfinance` library. |
+| NSE / niftyindices.com historical index data                                                 | Free                   | The official source, but no supported API (session cookies, blocks automated clients). Best for one-off verification.                                                                                         |
+| Stooq, Alpha Vantage, Twelve Data, EOD Historical Data                                       | Free tiers with limits | Coverage of NSE indices on the free tiers is unreliable or needs a key; not chosen.                                                                                                                           |
+
+Yahoo was chosen because it needs no credentials and its format is stable in practice. The refresh job's overlap check (the last CSV close must match the source within 0.01) stops a different or adjusted series from being appended. Approval needed: whether Yahoo's terms are acceptable for this use (see `docs/decisions/2026-10-04-open-decisions.md`).
 
 ## Open questions
 

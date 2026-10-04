@@ -28,7 +28,15 @@ export const assessSuitability = (
   simulationId: string,
   profile: ProfileForm,
   fetchImpl?: typeof fetch,
-) => api.suitability({ simulationId, profile: clientProfile(profile) }, fetchImpl);
+) =>
+  api.suitability(
+    {
+      simulationId,
+      profile: clientProfile(profile),
+      ...(profile.profileId ? { profileId: profile.profileId } : {}),
+    },
+    fetchImpl,
+  );
 
 /** POST /api/explain: plain-language explanation written by the AI service. */
 export const explain = (simulationId: string, fetchImpl?: typeof fetch) =>

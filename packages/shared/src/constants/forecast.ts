@@ -29,3 +29,13 @@ export type UnderlyingAssetClass = (typeof UNDERLYING_ASSET_CLASSES)[number];
 export function tenorToTradingDays(tenorDays: number): number {
   return Math.round((tenorDays * TRADING_DAYS_PER_YEAR) / CALENDAR_DAYS_PER_YEAR);
 }
+
+/**
+ * Forecast symbol for a DCD currency pair: deposit then alternate currency, e.g. `USDINR`, quoted
+ * as units of the alternate currency per 1 unit of the deposit currency (the DCD strike's quote,
+ * docs/product-formulas.md). Proposed convention: the forecast service must accept it
+ * (assetClass `fx`) before Mode A works for DCD.
+ */
+export function fxForecastSymbol(depositCurrency: string, alternateCurrency: string): string {
+  return `${depositCurrency.toUpperCase()}${alternateCurrency.toUpperCase()}`;
+}

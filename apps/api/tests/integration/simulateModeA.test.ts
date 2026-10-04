@@ -11,6 +11,7 @@ import { buildConfig } from '../../src/config/index.js';
 import { parseEnv } from '../../src/config/env.js';
 import { createApp } from '../../src/app.js';
 import { ForecastError, type ForecastClient } from '../../src/services/ai/forecastClient.js';
+import type { HistoryProvider } from '../../src/services/market-data/history/yahooHistoryProvider.js';
 import { createMarketDataService } from '../../src/services/market-data/marketDataService.js';
 import { silentLogger } from '../../src/utils/logger.js';
 import { makeForecast } from '../fixtures/forecast.js';
@@ -190,18 +191,76 @@ describe('POST /api/simulate — Mode A errors', () => {
     });
   });
 
-  it('DCD has no Mode A yet → NOT_IMPLEMENTED (501)', async () => {
+  it('DCD: forecasts the FX pair and runs the DCD engine on X_T', async () => {
+    const calls: ForecastRequestInput[] = [];
+    const client: ForecastClient = {
+      forecast: (input) => {
+        calls.push(input);
+        return Promise.resolve(
+          makeForecast({ spot: 84, tenorDays: input.tenorDays, samplePathCount: 100 }),
+        );
+      },
+    };
     const terms = {
-      depositCurrency: 'USD',
+      depositCurrency: 'usd',
       alternateCurrency: 'INR',
       depositAmount: 100_000,
       tenorDays: 90,
       strikeRate: 84,
       enhancedRatePct: 8,
     };
-    const res = await post({ mode: 'A', productType: 'DCD', terms });
-    expect(res.status).toBe(501);
-    expect(errorBody(res).code).toBe('NOT_IMPLEMENTED');
+    const res = await post({ mode: 'A', productType: 'DCD', terms }, appWith(client));
+    expect(res.status).toBe(200);
+    expect(calls[0]?.underlying).toEqual({ symbol: 'USDINR', assetClass: 'fx' });
+
+    const r = out(res);
+    const full = 100_000 * (1 + 0.08 * (90 / 365));
+    // Low case: X_T = 71.4 < K, repaid in USD in full. High case: X_T = 102.48 > K, converted.
+    expect(r.cases.low.payoff).toBeCloseTo(full, 6);
+    expect(r.cases.low.knockedIn).toBeNull();
+    expect(r.cases.base.payoff).toBeCloseTo(full * (84 / (84 * 1.04)), 6);
+    expect(r.cases.high.payoff).toBeCloseTo(full * (84 / (84 * 1.22)), 6);
+    expect(r.cases.high.returnPct).toBeLessThan(0);
+    expect(r.distribution.probabilityOfKnockIn).toBeNull();
+    expect(r.distribution.probabilityOfLoss).toBeGreaterThan(0);
+    expect(r.scenarios.map((x) => x.shockPct)).toEqual([...SCENARIO_SHOCKS]);
+    expect(r.breakevens.length).toBeGreaterThan(0);
+  });
+
+  it('shows the history as unavailable when no provider is configured', async () => {
+    const res = await post({ mode: 'A', productType: 'ELN', terms: eln });
+    expect(out(res).history).toEqual({
+      status: 'unavailable',
+      reason: 'No price history provider is configured',
+    });
+  });
+
+  it('adds recent closes to the fan when they match the forecast spot', async () => {
+    const history: HistoryProvider = {
+      name: 'Test history',
+      dailyCloses: () =>
+        Promise.resolve([
+          { date: '2026-09-30', close: 24_800 },
+          { date: '2026-10-01', close: 24_900 },
+          { date: '2026-10-02', close: SPOT },
+          { date: '2026-10-03', close: 25_100 }, // after the forecast's as-of date: dropped
+        ]),
+    };
+    const app = createApp(config, silentLogger, {
+      marketData: createMarketDataService({}),
+      forecast: fakeForecast().client,
+      history,
+    });
+    const r = out(await post({ mode: 'A', productType: 'ELN', terms: eln }, app));
+    expect(r.history).toEqual({
+      status: 'ok',
+      source: 'Test history',
+      points: [
+        { date: '2026-09-30', close: 24_800 },
+        { date: '2026-10-01', close: 24_900 },
+        { date: '2026-10-02', close: SPOT },
+      ],
+    });
   });
 
   it.each([

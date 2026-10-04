@@ -124,9 +124,13 @@ const modeA = {
     .default(DEFAULT_TRAINING_WINDOW_YEARS),
 };
 
-/** Mode A needs a forecast of the underlying, so it covers ELN and CPN (no FX forecast yet). */
+/**
+ * Mode A forecasts the underlying (ELN, CPN) or the FX pair (DCD, symbol `fxForecastSymbol`,
+ * asset class `fx`). The forecast service decides which underlyings it supports.
+ */
 export const simulateModeARequestSchema = z.discriminatedUnion('productType', [
   z.strictObject({ ...modeA, productType: z.literal('ELN'), terms: elnTermsSchema }),
+  z.strictObject({ ...modeA, productType: z.literal('DCD'), terms: dcdTermsSchema }),
   z.strictObject({ ...modeA, productType: z.literal('CPN'), terms: cpnTermsSchema }),
 ]);
 
@@ -139,7 +143,7 @@ export interface ModeACaseResult {
   /** Lowest level on the case path (an American barrier is tested against the whole path). */
   pathMin: number;
   payoff: number;
-  /** Percent number, relative to the notional. */
+  /** Percent number, relative to the amount invested (notional or deposit amount). */
   returnPct: number;
   lossAmount: number;
   /** `null` when the product has no barrier. */
@@ -151,7 +155,7 @@ export interface SimulateModeAResponse {
   /** Id for /api/suitability, /api/explain and /api/chat. */
   simulationId: string;
   mode: 'A';
-  productType: 'ELN' | 'CPN';
+  productType: 'ELN' | 'DCD' | 'CPN';
   /** Starting level the forecast was run from, with the date of that close. */
   spot: { value: number; asOf: string };
   horizon: { tenorDays: number; tradingDays: number };
@@ -191,5 +195,16 @@ export interface SimulateModeAResponse {
   /** PRD §7.1 scenario comparison table, from the spot. */
   scenarios: ShockOutcome[];
   breakevens: BreakevenPoint[];
+  /** Recent daily closes for the fan chart, or why they are not shown. Display only. */
+  history: PriceHistory;
   notice: string;
 }
+
+/**
+ * Daily closes up to the forecast's as-of date (holidays skipped, never filled). `unavailable`
+ * when no history provider is configured, it failed, or its last close does not match the
+ * forecast's spot (a different source): nothing is substituted.
+ */
+export type PriceHistory =
+  | { status: 'ok'; source: string; points: Array<{ date: string; close: number }> }
+  | { status: 'unavailable'; reason: string };

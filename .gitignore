@@ -23,6 +23,7 @@ serviceAccountKey.json
 *-firebase-adminsdk-*.json
 
 # Firebase local runtime output
+dataconnect/.dataconnect/
 .firebase/
 firebase-debug.log
 firestore-debug.log

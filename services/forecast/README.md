@@ -57,29 +57,35 @@ Errors: `{ "error": { "code", "message" } }` with `401 UNAUTHORIZED`, `422 INVAL
 
 ## Data refresh
 
-`forecast_service/refresh.py` appends new daily closes from the Upstox historical candle API (`GET /v3/historical-candle/NSE_INDEX|Nifty 50/days/1/{to}/{from}`). It needs `UPSTOX_ACCESS_TOKEN` (the same token as the backend's live feed).
+`forecast_service/refresh.py` appends new daily closes to `data/nifty50_clean.csv`. Sources:
+
+- `yahoo` (default): Yahoo Finance chart API for `^NSEI`. Free, no account or key; unofficial (no SLA; Yahoo's terms apply). Prices are rounded to 2 decimals (Yahoo returns float32 noise) and bars without a close (holidays) are skipped. `YAHOO_API_URL` overrides the host.
+- `upstox`: `GET /v3/historical-candle/NSE_INDEX|Nifty 50/days/1/{to}/{from}`; needs `UPSTOX_ACCESS_TOKEN`.
 
 ```bash
-UPSTOX_ACCESS_TOKEN=... python -m forecast_service.refresh --dry-run   # fetch and validate only
-UPSTOX_ACCESS_TOKEN=... python -m forecast_service.refresh             # append and save
+python -m forecast_service.refresh --dry-run                    # Yahoo: fetch and validate only
+python -m forecast_service.refresh                              # Yahoo: append and save
+UPSTOX_ACCESS_TOKEN=... python -m forecast_service.refresh --source upstox
 ```
 
-- It re-fetches the last day already in the CSV and aborts if Upstox's close differs by more than 0.01, which catches a different or adjusted source.
+`REFRESH_SOURCE` sets the default source.
+
+- It re-fetches the last day already in the CSV and aborts if the source's close differs by more than 0.01, which catches a different or adjusted source.
 - It ignores today's candle before 16:00 IST, validates every new row (positive prices, consistent OHLC, unique new dates), and never fills holidays.
 - It writes atomically (temp file + rename). On any error nothing is written and the exit code is 1.
 - The running service picks up the new file automatically.
 
 Schedule it after the close on trading days, for example at 16:30 IST:
 
-- Linux/macOS cron: `30 16 * * 1-5 cd /path/to/services/forecast && UPSTOX_ACCESS_TOKEN=... python -m forecast_service.refresh >> refresh.log 2>&1` (cron uses the server's time zone).
-- Windows Task Scheduler: a daily task at 16:30 that runs `python -m forecast_service.refresh` with `services/forecast` as the start folder, with `UPSTOX_ACCESS_TOKEN` set for that user.
+- Linux/macOS cron: `30 16 * * 1-5 cd /path/to/services/forecast && python -m forecast_service.refresh >> refresh.log 2>&1` (cron uses the server's time zone).
+- Windows Task Scheduler: a daily task at 16:30 that runs `python -m forecast_service.refresh` with `services/forecast` as the start folder.
 
 If a run fails, or no job runs for more than 5 days, forecasts fail with `DATA_STALE` and `/v1/health` reports `stale`. The service never forecasts on old data.
 
 ## Known limitations
 
-- New rows leave `Turnover_Cr` empty (the candle API has no turnover) and leave `Shares_Traded` empty when Upstox sends no positive volume. The model uses only `Close`.
-- Upstox's docs require a Bearer access token for this endpoint and don't say whether an Analytics token works. Run `--dry-run` once with your token before scheduling; if it needs a daily OAuth token, the job must refresh it.
-- Three rows close exactly at the previous day's close (2016-10-27, 2017-03-31, 2024-05-08) and may be stale fills; check against the source.
+- New rows leave `Turnover_Cr` empty (the candle API has no turnover) and leave `Shares_Traded` empty when the source sends no positive volume (Yahoo reports 0 for the index). The model uses only `Close`.
+- Neither source has been called from this repository's CI or sandbox (outbound access was blocked); run `--dry-run` once before scheduling. For Upstox, the docs don't say whether an Analytics token works for historical candles.
+- Three rows close exactly at the previous day's close (2016-10-27, 2017-03-31, 2024-05-08). Each has its own open, high, low, volume and turnover with the close inside the day's range, so they look like genuine equal closes rather than copied rows; not yet confirmed against NSE's official data.
 - The drift was chosen after earlier backtest results were seen, so the published coverage is slightly optimistic. Backtests beyond 365 days rest on 2–5 independent windows.
 - Backtest numbers were produced before the 1.0.1 variance fix; re-run `forecast_service.model.backtest(df, h, drift_pct=0.03)` to refresh them.

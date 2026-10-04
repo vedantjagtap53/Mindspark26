@@ -62,7 +62,7 @@ export function ModePicker({
             <h2 className="font-serif text-base font-bold">Simulation mode</h2>
             <p className="text-xs text-[var(--ink-muted)]">
               {run.mode === 'A'
-                ? 'GARCH(1,1) Monte Carlo forecast of the underlying, then the payoff engine'
+                ? `GARCH(1,1) Monte Carlo forecast of the ${isDcd ? 'FX rate' : 'underlying'}, then the payoff engine`
                 : 'Starting level moved by a shock, then the payoff engine'}
             </p>
           </div>
@@ -73,7 +73,7 @@ export function ModePicker({
             value={run.mode}
             onChange={(v) => set('mode', v)}
             options={[
-              { value: 'A', label: 'Mode A: Forecast', disabled: isDcd },
+              { value: 'A', label: 'Mode A: Forecast' },
               { value: 'B', label: 'Mode B: Shock' },
             ]}
           />

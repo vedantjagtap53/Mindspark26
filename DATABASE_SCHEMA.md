@@ -88,3 +88,18 @@ firebase emulators:exec --only dataconnect --project demo-mindspark   "cd apps/a
 ```
 
 `FDC_TEST_SERVICE_ID` and `FDC_TEST_LOCATION` must match the service ID and location in `dataconnect.yaml` (defaults `mindspark`, `asia-south1`).
+
+## Wiring (2026-10-04)
+
+`apps/api/src/app.ts` builds the Firebase repositories when `FIREBASE_PROJECT_ID`, `FIREBASE_SQL_CONNECT_SERVICE_ID` and `FIREBASE_SQL_CONNECT_LOCATION` are set. `apps/api/src/services/persistence/persistenceService.ts` writes the audit record at `/api/suitability` (configuration, simulation + risk results + profile snapshot, verdict) and the explanation at `/api/explain`; `/api/client-profiles` uses the client profile repository. Repository errors map to API errors: `not_configured` → `DATABASE_NOT_CONFIGURED`, `unavailable` → `DATABASE_ERROR`, `conflict` → `CONFLICT`, `invalid_reference` → `NOT_FOUND`. There is no fallback store.
+
+Verified 2026-10-04 against the SQL Connect emulator (3.4.22, local PostgreSQL 16): the contract suite (24/24), `tests/emulator/persistenceFlow.emulator.test.ts` (whole app through the adapter) and the browser test for saved profiles. When `firebase emulators:exec` cannot reach Google from a restricted network, the emulator binary can run directly against a local PostgreSQL:
+
+```bash
+~/.cache/firebase/emulators/dataconnect-emulator-<version> dev -listen=127.0.0.1:9399 -config_dir=dataconnect \
+  -local_connection_string="postgresql://postgres@127.0.0.1:5432/emulator?sslmode=disable"
+DATA_CONNECT_EMULATOR_HOST=127.0.0.1:9399 FDC_TEST_SERVICE_ID=finstruct-service FDC_TEST_LOCATION=asia-southeast1 \
+  npx vitest run tests/emulator   # from apps/api
+```
+
+**Still needed for production:** a Firebase project with SQL Connect and a Cloud SQL instance; the real `serviceId`, `location`, instance and database in `dataconnect/dataconnect.yaml` (the current values are placeholders); `firebase deploy --only dataconnect` to apply the schema and connector; and a service account (or ADC) for the API.

@@ -1,7 +1,12 @@
-"""Append new Nifty 50 daily closes to data/nifty50_clean.csv from the Upstox historical candle API.
+"""Append new Nifty 50 daily closes to data/nifty50_clean.csv.
+
+Sources (--source, or REFRESH_SOURCE):
+- yahoo (default): Yahoo Finance chart API for ^NSEI. Free, no account or key; unofficial (no SLA,
+  Yahoo's terms apply), so the source check below matters.
+- upstox: Upstox historical candle API; needs UPSTOX_ACCESS_TOKEN.
 
 Run from services/forecast after the close on trading days (e.g. 16:30 IST):
-    UPSTOX_ACCESS_TOKEN=... python -m forecast_service.refresh [--csv PATH] [--dry-run]
+    python -m forecast_service.refresh [--source yahoo|upstox] [--csv PATH] [--dry-run]
 
 Safety rules (the forecast must never run on invented or mixed data):
 - Only real candles are appended; nothing is filled or interpolated (holidays stay gaps).
@@ -20,6 +25,10 @@ import pandas as pd
 from .config import DEFAULT_DATA_PATH
 
 INSTRUMENT_KEY = "NSE_INDEX|Nifty 50"
+YAHOO_SYMBOL = "^NSEI"
+YAHOO_API_URL = "https://query1.finance.yahoo.com"
+UPSTOX_API_URL = "https://api.upstox.com/v3"
+SOURCES = ("yahoo", "upstox")
 IST = dt.timezone(dt.timedelta(hours=5, minutes=30))
 SESSION_COMPLETE = dt.time(16, 0)          # NSE closes 15:30 IST; leave a margin
 CLOSE_TOLERANCE = 0.01                     # index points; closes are quoted to 2 decimals
@@ -35,17 +44,28 @@ def candle_url(api_url, instrument_key, from_date, to_date):
     return f"{api_url.rstrip('/')}/historical-candle/{key}/days/1/{to_date.isoformat()}/{from_date.isoformat()}"
 
 
-def http_get_json(url, token, timeout=20):
-    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}", "Accept": "application/json"})
+def yahoo_url(api_url, symbol, from_date, to_date):
+    """Daily bars from from_date to to_date inclusive (period2 is exclusive, so one day is added)."""
+    start = int(dt.datetime.combine(from_date, dt.time(0), IST).timestamp())
+    end = int(dt.datetime.combine(to_date + dt.timedelta(days=1), dt.time(0), IST).timestamp())
+    q = urllib.parse.urlencode({"period1": start, "period2": end, "interval": "1d", "events": "history"})
+    return f"{api_url.rstrip('/')}/v8/finance/chart/{urllib.parse.quote(symbol, safe='')}?{q}"
+
+
+def http_get_json(url, token, timeout=20, provider="Upstox"):
+    headers = {"Accept": "application/json", "User-Agent": "Mozilla/5.0 (forecast-refresh)"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as res:
             return json.loads(res.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
-        raise RefreshError(f"Upstox returned HTTP {e.code}") from None
+        raise RefreshError(f"{provider} returned HTTP {e.code}") from None
     except (urllib.error.URLError, TimeoutError) as e:
-        raise RefreshError(f"Upstox is unreachable: {getattr(e, 'reason', e)}") from None
+        raise RefreshError(f"{provider} is unreachable: {getattr(e, 'reason', e)}") from None
     except json.JSONDecodeError:
-        raise RefreshError("Upstox returned invalid JSON") from None
+        raise RefreshError(f"{provider} returned invalid JSON") from None
 
 
 def fetch_candles(from_date, to_date, token, api_url, get=http_get_json):
@@ -69,6 +89,43 @@ def fetch_candles(from_date, to_date, token, api_url, get=http_get_json):
     return dict(sorted(out.items()))
 
 
+def fetch_yahoo_candles(from_date, to_date, api_url, get=None):
+    """Daily bars from Yahoo's chart API as {date: (open, high, low, close, volume)}, oldest first.
+
+    Bars with no close (Yahoo sometimes lists holidays with nulls) are dropped, never filled.
+    Prices are rounded to 2 decimals, the precision NSE quotes the index in (Yahoo returns
+    float32 noise such as 22421.949219).
+    """
+    get = get or (lambda url, token: http_get_json(url, token, provider="Yahoo Finance"))
+    body = get(yahoo_url(api_url, YAHOO_SYMBOL, from_date, to_date), "")
+    try:
+        chart = body["chart"]
+        if chart.get("error"):
+            raise RefreshError(f"Yahoo Finance error: {chart['error']}")
+        res = chart["result"][0]
+        meta, stamps, quote = res["meta"], res.get("timestamp") or [], res["indicators"]["quote"][0]
+    except (KeyError, IndexError, TypeError):
+        raise RefreshError("Unexpected Yahoo Finance response: no chart.result") from None
+    if meta.get("symbol") != YAHOO_SYMBOL or meta.get("currency") not in (None, "INR"):
+        raise RefreshError(f"Yahoo Finance returned {meta.get('symbol')} in {meta.get('currency')}, not {YAHOO_SYMBOL} in INR")
+    out = {}
+    for i, ts in enumerate(stamps):
+        try:
+            o, h, l, c = (quote[k][i] for k in ("open", "high", "low", "close"))
+            vol = (quote.get("volume") or [None] * len(stamps))[i]
+            day = dt.datetime.fromtimestamp(int(ts), IST).date()
+        except (IndexError, KeyError, TypeError, ValueError, OverflowError):
+            raise RefreshError(f"Malformed Yahoo Finance bar at index {i}") from None
+        if c is None:
+            continue
+        if None in (o, h, l):
+            raise RefreshError(f"{day}: Yahoo Finance bar has a close but no open/high/low")
+        if day in out:
+            raise RefreshError(f"Duplicate bar for {day}")
+        out[day] = tuple(round(float(x), 2) for x in (o, h, l, c)) + (vol,)
+    return dict(sorted(out.items()))
+
+
 def _check_row(day, o, h, l, c):
     if not all(math.isfinite(v) and v > 0 for v in (o, h, l, c)):
         raise RefreshError(f"{day}: prices must be positive and finite")
@@ -81,10 +138,10 @@ def new_rows(df, candles, now_ist):
     last_day = df.Date.max().date()
     last_close = float(df.Close.iloc[-1])
     if last_day not in candles:
-        raise RefreshError(f"Upstox has no candle for {last_day}, the last CSV day; cannot confirm the source matches")
+        raise RefreshError(f"The source has no candle for {last_day}, the last CSV day; cannot confirm the source matches")
     src_close = candles[last_day][3]
     if abs(src_close - last_close) > CLOSE_TOLERANCE:
-        raise RefreshError(f"Source mismatch on {last_day}: CSV close {last_close}, Upstox close {src_close}. Not appending.")
+        raise RefreshError(f"Source mismatch on {last_day}: CSV close {last_close}, source close {src_close}. Not appending.")
 
     today = now_ist.date()
     rows, prev = [], last_close
@@ -115,15 +172,22 @@ def write_atomic(path, df, rows):
         raise
 
 
-def refresh(csv_path, token, api_url, now_ist=None, get=http_get_json, dry_run=False):
-    """Returns the number of rows appended (or that would be appended, with dry_run)."""
-    if not token:
+def refresh(csv_path, token, api_url, now_ist=None, get=None, dry_run=False, source="upstox"):
+    """Returns the number of rows appended (or that would be appended, with dry_run).
+    `get(url, token)` fetches JSON (tests pass a fake); `api_url` is the chosen source's base URL."""
+    if source not in SOURCES:
+        raise RefreshError(f"Unknown source {source!r}; use one of {', '.join(SOURCES)}")
+    if source == "upstox" and not token:
         raise RefreshError("UPSTOX_ACCESS_TOKEN is not set")
     now_ist = now_ist or dt.datetime.now(IST)
     df = pd.read_csv(csv_path, parse_dates=["Date"]).sort_values("Date").reset_index(drop=True)
     if df.empty:
         raise RefreshError(f"{csv_path} is empty")
-    candles = fetch_candles(df.Date.max().date(), now_ist.date(), token, api_url, get)
+    from_day, to_day = df.Date.max().date(), now_ist.date()
+    if source == "yahoo":
+        candles = fetch_yahoo_candles(from_day, to_day, api_url, get)
+    else:
+        candles = fetch_candles(from_day, to_day, token, api_url, get or http_get_json)
     rows = new_rows(df, candles, now_ist)
     if rows and not dry_run:
         write_atomic(Path(csv_path), df, rows)
@@ -133,11 +197,14 @@ def refresh(csv_path, token, api_url, now_ist=None, get=http_get_json, dry_run=F
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--csv", default=os.getenv("DATA_PATH", str(DEFAULT_DATA_PATH)))
+    p.add_argument("--source", choices=SOURCES, default=os.getenv("REFRESH_SOURCE", "yahoo"))
     p.add_argument("--dry-run", action="store_true", help="fetch and validate, but do not write")
     a = p.parse_args(argv)
     try:
-        n = refresh(Path(a.csv), os.getenv("UPSTOX_ACCESS_TOKEN", ""),
-                    os.getenv("UPSTOX_API_URL", "https://api.upstox.com/v3"), dry_run=a.dry_run)
+        api_url = (os.getenv("YAHOO_API_URL", YAHOO_API_URL) if a.source == "yahoo"
+                   else os.getenv("UPSTOX_API_URL", UPSTOX_API_URL))
+        n = refresh(Path(a.csv), os.getenv("UPSTOX_ACCESS_TOKEN", ""), api_url,
+                    dry_run=a.dry_run, source=a.source)
     except RefreshError as e:
         print(f"refresh failed: {e}", file=sys.stderr)
         return 1

@@ -62,6 +62,10 @@ const envSchema = z
     // Daily FX reference rates (Frankfurter). Slack covers weekends and holidays.
     FX_API_URL: unsetIfEmpty(z.url().default('https://api.frankfurter.dev')),
     FX_RATE_MAX_AGE_DAYS: unsetIfEmpty(z.coerce.number().int().positive().default(4)),
+    // Daily closes for the Mode A fan chart. Off by default: Yahoo Finance is free and keyless
+    // but unofficial (no SLA; its terms apply).
+    MARKET_HISTORY_PROVIDER: unsetIfEmpty(z.enum(['none', 'yahoo']).default('none')),
+    MARKET_HISTORY_API_URL: unsetIfEmpty(z.url().default('https://query1.finance.yahoo.com')),
   })
   .superRefine((env, ctx) => {
     if (!env.FIREBASE_CLIENT_EMAIL !== !env.FIREBASE_PRIVATE_KEY) {

@@ -8,18 +8,20 @@ import { parseEnv } from '../../src/config/env.js';
 import { createDataConnectRunner } from '../../src/repositories/firebase/dataConnectRunner.js';
 import { createFirebaseRepositories } from '../../src/repositories/firebase/firebaseRepositories.js';
 import { runRepositoryContract } from '../contract/repositoryContract.js';
+import { runPersistenceFlow } from './persistenceFlow.js';
 
 const emulatorHost =
   process.env.FIREBASE_DATA_CONNECT_EMULATOR_HOST ?? process.env.DATA_CONNECT_EMULATOR_HOST;
 
-const db = buildConfig(
+const config = buildConfig(
   parseEnv({
     FIREBASE_PROJECT_ID: process.env.FDC_TEST_PROJECT_ID ?? 'demo-mindspark',
     FIREBASE_SQL_CONNECT_SERVICE_ID: process.env.FDC_TEST_SERVICE_ID ?? 'mindspark',
     FIREBASE_SQL_CONNECT_LOCATION: process.env.FDC_TEST_LOCATION ?? 'asia-south1',
     DATA_CONNECT_EMULATOR_HOST: emulatorHost,
   }),
-).database;
+);
+const db = config.database;
 
 /** Test-only: empties every table. Refuses to run anywhere but the emulator. */
 async function resetEmulatorDatabase(): Promise<void> {
@@ -44,4 +46,8 @@ describe.skipIf(!emulatorHost)('Firebase SQL Connect adapter (emulator)', () => 
     await resetEmulatorDatabase();
     return repos;
   });
+});
+
+describe.skipIf(!emulatorHost)('persistence through the app (emulator)', () => {
+  runPersistenceFlow(config);
 });

@@ -165,3 +165,68 @@ def test_cli_fails_without_a_token():
         if saved is not None:
             os.environ["UPSTOX_ACCESS_TOKEN"] = saved
 
+
+
+# ---- Yahoo Finance source (free, no key) ----
+
+def ist_open(day):
+    """Yahoo stamps NSE daily bars at the 09:15 IST open."""
+    return int(dt.datetime.combine(dt.date.fromisoformat(day), dt.time(9, 15), IST).timestamp())
+
+
+def yahoo_body(bars, symbol="^NSEI", currency="INR"):
+    return {"chart": {"error": None, "result": [{
+        "meta": {"symbol": symbol, "currency": currency, "exchangeTimezoneName": "Asia/Kolkata"},
+        "timestamp": [ist_open(b[0]) for b in bars],
+        "indicators": {"quote": [{
+            "open": [b[1] for b in bars], "high": [b[2] for b in bars], "low": [b[3] for b in bars],
+            "close": [b[4] for b in bars], "volume": [b[5] for b in bars]}]}}]}}
+
+
+def yahoo_run(path, body, now=AFTER_CLOSE, calls=None, **kw):
+    def get(url, token):
+        if calls is not None:
+            calls.append((url, token))
+        return body
+    return rd.refresh(path, "", "https://yahoo.example", now_ist=now, get=get, source="yahoo", **kw)
+
+
+# Yahoo returns float32 noise; the last CSV close is 22421.95.
+YAHOO_NEW = [(LAST_DAY, 22543.69921875, 22610.6, 22217.30078125, 22421.94921875, 0),
+             ("2026-10-02", None, None, None, None, None),                    # holiday listed with nulls
+             ("2026-10-05", 22430.0, 22600.0, 22400.0, 22550.5, 0),
+             ("2026-10-06", 22550.0, 22700.0, 22500.0, 22650.25, 0)]
+
+
+def test_yahoo_appends_new_days_rounded_and_skips_null_bars():
+    p = tmp_csv(); before = len(pd.read_csv(p)); calls = []
+    assert yahoo_run(p, yahoo_body(YAHOO_NEW), calls=calls) == 2
+    df = pd.read_csv(p)
+    assert len(df) == before + 2
+    assert df.tail(2).Date.tolist() == ["2026-10-05", "2026-10-06"]       # 2026-10-02 not filled
+    assert "/v8/finance/chart/%5ENSEI?" in calls[0][0] and "interval=1d" in calls[0][0]
+    assert calls[0][1] == ""                                                # no key is sent
+
+
+def test_yahoo_needs_no_token_but_checks_the_overlap_day():
+    p = tmp_csv()
+    bad = [(LAST_DAY, 1, 2, 0.5, 22500.0, 0)] + YAHOO_NEW[2:]
+    expect_error(lambda: yahoo_run(p, yahoo_body(bad)), "Source mismatch")
+
+
+def test_yahoo_rejects_wrong_symbol_and_malformed_body():
+    p = tmp_csv()
+    expect_error(lambda: yahoo_run(p, yahoo_body(YAHOO_NEW, symbol="^GSPC")), "not ^NSEI")
+    expect_error(lambda: yahoo_run(p, {"chart": {"result": None, "error": None}}), "Unexpected Yahoo")
+    expect_error(lambda: yahoo_run(p, {"chart": {"result": None, "error": {"code": "Not Found"}}}), "Yahoo Finance error")
+
+
+def test_yahoo_url_covers_the_whole_range():
+    url = rd.yahoo_url("https://y.example/", "^NSEI", dt.date(2026, 10, 1), dt.date(2026, 10, 6))
+    q = dict(x.split("=") for x in url.split("?")[1].split("&"))
+    assert int(q["period1"]) == int(dt.datetime(2026, 10, 1, tzinfo=IST).timestamp())
+    assert int(q["period2"]) == int(dt.datetime(2026, 10, 7, tzinfo=IST).timestamp())
+
+
+def test_unknown_source_is_refused():
+    expect_error(lambda: rd.refresh(tmp_csv(), "", "x", source="stooq"), "Unknown source")

@@ -7,6 +7,8 @@ import type {
   SuitabilityResponse,
   SimulateModeAResponse,
   SimulateModeBResponse,
+  SavedProfile,
+  SavedProfileList,
   ValidationIssue,
 } from '@mindspark/shared';
 
@@ -25,17 +27,19 @@ export class ApiRequestError extends Error {
 const isErrorResponse = (v: unknown): v is ApiErrorResponse =>
   typeof v === 'object' && v !== null && 'error' in v;
 
-export async function postJson<T>(
+export async function requestJson<T>(
+  method: 'GET' | 'POST' | 'PUT',
   path: string,
-  body: unknown,
+  body?: unknown,
   fetchImpl: typeof fetch = fetch,
 ): Promise<T> {
   let res: Response;
   try {
     res = await fetchImpl(path, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
+      method,
+      ...(body === undefined
+        ? {}
+        : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
     });
   } catch {
     throw new ApiRequestError(
@@ -59,6 +63,9 @@ export async function postJson<T>(
   return payload as T;
 }
 
+export const postJson = <T>(path: string, body: unknown, fetchImpl?: typeof fetch) =>
+  requestJson<T>('POST', path, body, fetchImpl);
+
 export type SimulateResponse = SimulateModeAResponse | SimulateModeBResponse;
 
 export const api = {
@@ -72,4 +79,10 @@ export const api = {
     postJson<ExplainResponse>('/api/explain', body, fetchImpl),
   chat: (body: unknown, fetchImpl?: typeof fetch) =>
     postJson<ChatResponse>('/api/chat', body, fetchImpl),
+  listProfiles: (fetchImpl?: typeof fetch) =>
+    requestJson<SavedProfileList>('GET', '/api/client-profiles', undefined, fetchImpl),
+  createProfile: (body: unknown, fetchImpl?: typeof fetch) =>
+    requestJson<SavedProfile>('POST', '/api/client-profiles', body, fetchImpl),
+  updateProfile: (id: string, body: unknown, fetchImpl?: typeof fetch) =>
+    requestJson<SavedProfile>('PUT', `/api/client-profiles/${id}`, body, fetchImpl),
 };

@@ -99,7 +99,10 @@ export function SuitabilityPanel({ product, profile, run }: Props) {
             </ul>
           )}
           <p className="text-[10px] font-mono text-[var(--ink-muted)]">
-            Low case checked: {result.lowCase.label}, return {formatPct(result.lowCase.returnPct)}.
+            Low case checked: {result.lowCase.label}, return {formatPct(result.lowCase.returnPct)}.{' '}
+            {result.persisted
+              ? 'Recorded in the audit database with this profile.'
+              : 'Not recorded: the database is not configured.'}
             {run &&
               JSON.stringify(run.profile) !== JSON.stringify(profile) &&
               ' The profile has changed since this run: run again to re-check.'}

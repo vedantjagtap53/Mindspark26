@@ -23,6 +23,8 @@ export const simulationIdSchema = z.string().trim().min(1).max(100);
 export const suitabilityRequestSchema = z.strictObject({
   simulationId: simulationIdSchema,
   profile: clientProfileSchema,
+  /** The saved profile (GET /api/client-profiles) the fields came from, if any. Links the audit record. */
+  profileId: z.uuid().optional(),
 });
 export type SuitabilityRequest = z.output<typeof suitabilityRequestSchema>;
 
@@ -50,6 +52,12 @@ export interface SuitabilityResponse {
   lowCase: { label: string; returnPct: number; knockedIn: boolean | null };
   /** Fixed product risk rating used by the risk-appetite check. */
   productRiskRating: 'Low' | 'High';
+  /**
+   * Whether the simulation, verdict and profile snapshot were written to the database. `false`
+   * only when Firebase SQL Connect is not configured (development and tests); a configured
+   * database that fails returns DATABASE_ERROR instead.
+   */
+  persisted: boolean;
 }
 
 // ---- saved client profiles (GET/POST /api/client-profiles, GET/PUT /api/client-profiles/:id) ----
@@ -78,3 +86,7 @@ export interface SavedProfile extends ClientProfile {
 }
 
 export const profileIdSchema = z.uuid();
+
+export interface SavedProfileList {
+  profiles: SavedProfile[];
+}

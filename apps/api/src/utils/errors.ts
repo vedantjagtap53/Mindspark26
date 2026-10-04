@@ -3,6 +3,7 @@ import type { ApiErrorCode, ValidationIssue } from '@mindspark/shared';
 export const ERROR_STATUS: Record<ApiErrorCode, number> = {
   VALIDATION_ERROR: 400,
   NOT_FOUND: 404,
+  CONFLICT: 409,
   PAYLOAD_TOO_LARGE: 413,
   NOT_IMPLEMENTED: 501,
   DATABASE_NOT_CONFIGURED: 503,
