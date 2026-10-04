@@ -8,7 +8,8 @@ export const TENOR_DAYS_MAX = 1095;
 export const TRADING_DAYS_PER_YEAR = 252;
 export const CALENDAR_DAYS_PER_YEAR = 365;
 
-export type TrainingWindowYears = number;
+export const TRAINING_WINDOW_YEARS = [5, 10] as const;
+export type TrainingWindowYears = (typeof TRAINING_WINDOW_YEARS)[number];
 export const DEFAULT_TRAINING_WINDOW_YEARS: TrainingWindowYears = 10;
 
 export const SAMPLE_PATH_COUNT_MIN = 100;

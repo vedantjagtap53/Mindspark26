@@ -8,7 +8,6 @@ import {
   Sliders,
   Sparkles,
 } from 'lucide-react';
-import type { ProductType } from '../state/forms';
 
 export type Stage = 'MANDATE' | 'STRUCTURE' | 'SIMULATE' | 'OUTCOMES' | 'VERDICT';
 
@@ -25,8 +24,6 @@ export const STAGES: Array<{ id: Stage; label: string; icon: typeof Compass }> =
 interface Props {
   stage: Stage;
   onStage: (s: Stage) => void;
-  product: ProductType;
-  onProduct: (p: ProductType) => void;
   runCount: number;
   onOpenRuns: () => void;
   /** Absent when there is no result to print. */
@@ -38,8 +35,6 @@ interface Props {
 export function TopNav({
   stage,
   onStage,
-  product,
-  onProduct,
   runCount,
   onOpenRuns,
   onPrint,

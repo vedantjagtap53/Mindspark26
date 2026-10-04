@@ -120,8 +120,7 @@ export const SCENARIO_SHOCKS: readonly number[] = [-25, -10, 0, 15];
 const modeA = {
   mode: z.literal('A'),
   trainingWindowYears: z
-    .number()
-    .positive()
+    .union([z.literal(5), z.literal(10)])
     .default(DEFAULT_TRAINING_WINDOW_YEARS),
 };
 

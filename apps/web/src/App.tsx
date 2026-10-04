@@ -70,8 +70,6 @@ export function App() {
       <TopNav
         stage={stage}
         onStage={setStage}
-        product={product}
-        onProduct={setProduct}
         runCount={sim.runs.length}
         onOpenRuns={() => setRunsOpen(true)}
         onPrint={current ? () => setPrintRun(current) : undefined}
