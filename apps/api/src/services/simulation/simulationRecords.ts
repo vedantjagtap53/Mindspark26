@@ -1,0 +1,77 @@
+// Simulation runs kept in API memory so /api/suitability, /api/explain and /api/chat can work from
+// the backend's own numbers (the browser never sends results back). Approved by Karan 2026-10-04
+// as the interim until Firebase SQL Connect persistence is wired; records are lost on restart.
+// This is working state for a session, not a database: nothing is written anywhere else.
+
+import type {
+  ClientProfile,
+  ExplainResponse,
+  SimulateModeARequest,
+  SimulateModeAResponse,
+  SimulateModeBRequest,
+  SimulateModeBResponse,
+  SuitabilityResponse,
+} from '@mindspark/shared';
+import { AppError } from '../../utils/errors.js';
+
+export type SimulationRun =
+  | { request: SimulateModeARequest; response: SimulateModeAResponse }
+  | { request: SimulateModeBRequest; response: SimulateModeBResponse };
+
+export type SimulationRecord = SimulationRun & {
+  id: string;
+  createdAt: number;
+  profile?: ClientProfile;
+  suitability?: SuitabilityResponse;
+  explanation?: ExplainResponse;
+};
+
+export interface SimulationRecords {
+  save(record: SimulationRecord): void;
+  /** Throws NOT_FOUND for an unknown or expired id. */
+  get(id: string): SimulationRecord;
+  update(id: string, patch: Partial<Omit<SimulationRecord, 'id'>>): SimulationRecord;
+}
+
+export interface MemoryRecordsConfig {
+  maxRecords?: number;
+  ttlMs?: number;
+  now?: () => number;
+}
+
+export function createMemorySimulationRecords(config: MemoryRecordsConfig = {}): SimulationRecords {
+  const maxRecords = config.maxRecords ?? 500;
+  const ttlMs = config.ttlMs ?? 12 * 60 * 60 * 1000;
+  const now = config.now ?? Date.now;
+  // Map keeps insertion order: the first entry is the oldest.
+  const records = new Map<string, SimulationRecord>();
+
+  const get = (id: string): SimulationRecord => {
+    const record = records.get(id);
+    if (!record || now() - record.createdAt > ttlMs) {
+      records.delete(id);
+      throw new AppError(
+        'NOT_FOUND',
+        'Unknown or expired simulation: run the simulation again (runs are kept until the API restarts)',
+      );
+    }
+    return record;
+  };
+
+  return {
+    save(record) {
+      records.set(record.id, record);
+      while (records.size > maxRecords) {
+        const oldest = records.keys().next().value;
+        if (oldest === undefined) break;
+        records.delete(oldest);
+      }
+    },
+    get,
+    update(id, patch) {
+      const next = { ...get(id), ...patch } as SimulationRecord;
+      records.set(id, next);
+      return next;
+    },
+  };
+}

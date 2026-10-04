@@ -1,0 +1,9 @@
+node_modules/
+dist/
+build/
+coverage/
+package-lock.json
+dataconnect/.dataconnect/
+# Source requirement documents are kept byte-for-byte as supplied.
+PRD.md
+prd/

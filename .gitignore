@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+
+# Build output and tool caches
+dist/
+build/
+.vite/
+.turbo/
+.cache/
+coverage/
+playwright-report/
+test-results/
+
+# Local environment files and secrets (keep safe-to-share templates)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+serviceAccountKey.json
+*-firebase-adminsdk-*.json
+
+# Firebase local runtime output
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Python virtual environments, bytecode, and test/tool caches
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Generated RAG vector database
+services/rag/rag/store/
+
+# Runtime logs and temporary files
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+
+# OS and editor metadata
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
