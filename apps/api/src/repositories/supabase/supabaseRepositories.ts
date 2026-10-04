@@ -4,8 +4,7 @@
 import type { ProductType, SimulationMode } from '@mindspark/shared';
 import {
   validateSimulationInput,
-  type ClientProfileInput,
-  type ClientProfileRecord,
+  type ClientProfileSnapshot,
   type ExplanationRecord,
   type JsonObject,
   type ProductConfigurationRecord,
@@ -18,18 +17,6 @@ import { fromDb, toDb, toIso } from './mapping.js';
 import { unwrap, type Db } from './supabaseClient.js';
 
 // ---- rows as returned by PostgREST ----
-
-interface ProfileRow {
-  id: string;
-  client_ref: string;
-  label: string | null;
-  risk_appetite: string;
-  horizon_months: number;
-  loss_tolerance_pct: number;
-  concentration_pct: number;
-  created_at: string;
-  updated_at: string;
-}
 
 interface ConfigurationRow {
   id: string;
@@ -72,17 +59,14 @@ interface ExplanationRow {
   created_at: string;
 }
 
-type SnapshotRow = Omit<ClientProfileInput, 'riskAppetite'> & { riskAppetite: string };
-
 /** PostgREST embeds a one-to-one relation as an object; older versions return a one-element list. */
 type OneToOne<T> = T | T[] | null;
 
 interface SimulationRow {
   id: string;
-  profile_id: string | null;
   configuration: ConfigurationRow;
   mode: SimulationMode;
-  profile_snapshot: SnapshotRow | null;
+  profile_snapshot: ClientProfileSnapshot | null;
   level_value: number | null;
   level_source: string | null;
   level_as_of: string | null;
@@ -102,22 +86,12 @@ interface SimulationRow {
   explanations: ExplanationRow[];
 }
 
-interface SimulationSummaryRow {
-  id: string;
-  mode: SimulationMode;
-  created_at: string;
-  configuration: { product_type: ProductType; tenor_days: number; notional: number };
-  suitability_results: OneToOne<{ verdict: string }>;
-}
-
 type Key = { id: string };
 
-const PROFILE_COLUMNS =
-  'id, client_ref, label, risk_appetite, horizon_months, loss_tolerance_pct, concentration_pct, created_at, updated_at';
 const CONFIGURATION_COLUMNS =
   'id, product_type, underlying_symbol, deposit_currency, alternate_currency, tenor_days, notional, terms, created_at';
 const SIMULATION_SELECT = `
-  id, profile_id, mode, profile_snapshot,
+  id, mode, profile_snapshot,
   level_value, level_source, level_as_of, shock_pct, shocked_level,
   training_window_years, forecast_meta, path_count, probability_of_loss, probability_of_knock_in,
   payoff_p5, payoff_p50, payoff_p95, created_at,
@@ -129,27 +103,6 @@ const SIMULATION_SELECT = `
 // ---- mapping helpers ----
 
 const one = <T>(v: OneToOne<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
-
-const profileRow = (p: ClientProfileInput) => ({
-  client_ref: p.clientRef,
-  label: p.label,
-  risk_appetite: toDb.riskAppetite(p.riskAppetite),
-  horizon_months: p.horizonMonths,
-  loss_tolerance_pct: p.lossTolerancePct,
-  concentration_pct: p.concentrationPct,
-});
-
-const toProfile = (r: ProfileRow): ClientProfileRecord => ({
-  id: r.id,
-  clientRef: r.client_ref,
-  label: r.label,
-  riskAppetite: fromDb.riskAppetite(r.risk_appetite),
-  horizonMonths: r.horizon_months,
-  lossTolerancePct: r.loss_tolerance_pct,
-  concentrationPct: r.concentration_pct,
-  createdAt: toIso(r.created_at),
-  updatedAt: toIso(r.updated_at),
-});
 
 const toConfiguration = (r: ConfigurationRow): ProductConfigurationRecord => ({
   id: r.id,
@@ -176,10 +129,6 @@ const toRisk = (r: RiskRow): RiskResultRecord => ({
   createdAt: toIso(r.created_at),
 });
 
-/** Stored snapshots use the database enum; convert back to the application's vocabulary. */
-const toSnapshot = (s: SnapshotRow | null): ClientProfileInput | null =>
-  s ? { ...s, riskAppetite: fromDb.riskAppetite(s.riskAppetite) } : null;
-
 function required<T>(value: T | null, field: string, id: string): T {
   if (value === null) throw new Error(`Simulation ${id} is missing ${field}`);
   return value;
@@ -191,8 +140,7 @@ function toSimulation(r: SimulationRow): SimulationRecord {
   const common = {
     id,
     createdAt: toIso(r.created_at),
-    profileId: r.profile_id,
-    profileSnapshot: toSnapshot(r.profile_snapshot),
+    profileSnapshot: r.profile_snapshot,
     configuration: toConfiguration(r.configuration),
     riskResults: r.risk_results.map(toRisk),
     suitability: verdict
@@ -245,47 +193,6 @@ function toSimulation(r: SimulationRow): SimulationRecord {
 
 export function createSupabaseRepositories(db: Db): Repositories {
   return {
-    clientProfiles: {
-      async create(input) {
-        const row = unwrap<Key>(
-          await db.from('client_profiles').insert(profileRow(input)).select('id').single(),
-        );
-        return row.id;
-      },
-      async update(id, input) {
-        const rows = unwrap<Key[]>(
-          await db.from('client_profiles').update(profileRow(input)).eq('id', id).select('id'),
-        );
-        return rows.length > 0;
-      },
-      async getById(id) {
-        const row = unwrap<ProfileRow | null>(
-          await db.from('client_profiles').select(PROFILE_COLUMNS).eq('id', id).maybeSingle(),
-        );
-        return row ? toProfile(row) : null;
-      },
-      async getByRef(clientRef) {
-        const row = unwrap<ProfileRow | null>(
-          await db
-            .from('client_profiles')
-            .select(PROFILE_COLUMNS)
-            .eq('client_ref', clientRef)
-            .maybeSingle(),
-        );
-        return row ? toProfile(row) : null;
-      },
-      async list({ limit, offset }) {
-        const rows = unwrap<ProfileRow[]>(
-          await db
-            .from('client_profiles')
-            .select(PROFILE_COLUMNS)
-            .order('updated_at', { ascending: false })
-            .range(offset, offset + limit - 1),
-        );
-        return rows.map(toProfile);
-      },
-    },
-
     productConfigurations: {
       async create(input) {
         const row = unwrap<Key>(
@@ -322,12 +229,8 @@ export function createSupabaseRepositories(db: Db): Repositories {
         validateSimulationInput(input);
         const common = {
           configuration_id: input.configurationId,
-          profile_id: input.profileId,
           mode: input.mode,
-          profile_snapshot: input.profileSnapshot && {
-            ...input.profileSnapshot,
-            riskAppetite: toDb.riskAppetite(input.profileSnapshot.riskAppetite),
-          },
+          profile_snapshot: input.profileSnapshot,
         };
         const simulation =
           input.mode === 'A'
@@ -376,30 +279,6 @@ export function createSupabaseRepositories(db: Db): Repositories {
             .maybeSingle(),
         );
         return row ? toSimulation(row) : null;
-      },
-      async listForProfile(profileId, limit) {
-        const rows = unwrap<SimulationSummaryRow[]>(
-          await db
-            .from('simulations')
-            .select(
-              'id, mode, created_at, configuration:product_configurations!inner(product_type, tenor_days, notional), suitability_results(verdict)',
-            )
-            .eq('profile_id', profileId)
-            .order('created_at', { ascending: false })
-            .limit(limit),
-        );
-        return rows.map((s) => {
-          const verdict = one(s.suitability_results);
-          return {
-            id: s.id,
-            mode: s.mode,
-            createdAt: toIso(s.created_at),
-            productType: s.configuration.product_type,
-            tenorDays: s.configuration.tenor_days,
-            notional: s.configuration.notional,
-            verdict: verdict ? fromDb.verdict(verdict.verdict) : null,
-          };
-        });
       },
     },
 

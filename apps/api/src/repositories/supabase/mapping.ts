@@ -1,7 +1,7 @@
 // Translation between the application's vocabulary and the database's enums and formats.
 
 import type { LevelSource, SuitabilityVerdict } from '@mindspark/shared';
-import type { RiskAppetite, ScenarioCase } from '../interfaces/index.js';
+import type { ScenarioCase } from '../interfaces/index.js';
 
 const invert = <K extends string, V extends string>(m: Record<K, V>): Record<V, K> =>
   Object.fromEntries(Object.entries(m).map(([k, v]) => [v, k])) as Record<V, K>;
@@ -12,7 +12,6 @@ function lookup<V>(map: Record<string, V>, key: string, what: string): V {
   return v;
 }
 
-const RISK_APPETITE: Record<RiskAppetite, string> = { low: 'LOW', medium: 'MEDIUM', high: 'HIGH' };
 const LEVEL_SOURCE: Record<LevelSource, string> = {
   live: 'LIVE',
   manual: 'MANUAL',
@@ -31,14 +30,12 @@ const VERDICT: Record<SuitabilityVerdict, string> = {
 };
 
 export const toDb = {
-  riskAppetite: (v: RiskAppetite) => RISK_APPETITE[v],
   levelSource: (v: LevelSource) => LEVEL_SOURCE[v],
   scenario: (v: ScenarioCase) => SCENARIO[v],
   verdict: (v: SuitabilityVerdict) => VERDICT[v],
 };
 
 export const fromDb = {
-  riskAppetite: (v: string) => lookup(invert(RISK_APPETITE), v, 'risk appetite'),
   levelSource: (v: string) => lookup(invert(LEVEL_SOURCE), v, 'level source'),
   scenario: (v: string) => lookup(invert(SCENARIO), v, 'scenario'),
   verdict: (v: string) => lookup(invert(VERDICT), v, 'verdict'),

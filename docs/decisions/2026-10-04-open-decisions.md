@@ -50,8 +50,8 @@ The database moved from Firebase SQL Connect to Supabase on 2026-10-04 (approved
 8. **Suitability policy text.** `services/rag/rag/knowledge/policy/suitability_policy.md` is a DRAFT (RAG knowledge, AI/ML developer). It agrees with the engine but omits the following: which flags are hard (low-case loss; a high-risk product for a low appetite), that a medium appetite gives Caution for ELN/DCD, the 25% concentration limit, and the Mode B low case (worst of the −25/−10/0/+15% scenarios and the RM's shock). The institution's actual policy text is needed before production, and whether the rule list is complete is still open.
 
 9. **Smaller items.**
-   - `/api/suitability` now accepts an optional `profileId`, and its response has `persisted`. `CONFLICT` (409) was added for duplicate client references. All three are additive.
-   - The ad hoc (unsaved) profile snapshot is stored with `clientRef: "unsaved"`.
+   - `/api/suitability`'s response has `persisted` (additive).
+   - Saved client profiles were removed later the same day (see `IMPLEMENTATION_STATUS.md`). The client's name and age are stored in the audit snapshot; Karan confirmed the whole-number age limits (18–120) on 2026-10-04.
    - A database outage returns `DATABASE_ERROR` with HTTP 500 (the existing mapping); 503 may suit an outage better.
    - Root `Frontend/` and `ML/` look like pre-workspace copies of `apps/web` and `services/forecast`. They are now excluded from lint; delete them if no longer needed.
    - `npm audit`: clean since the database SDK change (the 2 moderate issues came from the removed Firebase SDK).

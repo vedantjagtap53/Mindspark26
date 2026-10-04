@@ -12,7 +12,7 @@ export function ModelCard({ model, backtest }: Props) {
     ['Model', `${model.name} v${model.version}`],
     [
       'Training window',
-      `${model.trainingWindowYears} years · ${model.trainingStart} to ${model.trainingEnd}`,
+      `${Math.round(model.trainingWindowYears * 365)} days · ${model.trainingStart} to ${model.trainingEnd}`,
     ],
     ['Observations', model.observations.toLocaleString('en-IN')],
     ['Simulations', model.simulations.toLocaleString('en-IN')],

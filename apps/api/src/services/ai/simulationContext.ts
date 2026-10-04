@@ -1,6 +1,6 @@
 // Builds the AI service's SimulationContext (services/rag/rag/schemas.py) from a stored run.
 // Only numbers the backend computed are sent: the AI explains them and never recalculates.
-// No client reference or name is sent, only the four profile fields the rules use.
+// No client name or age is sent, only the four profile fields the rules use.
 
 import type { SimulationRecord } from '../simulation/simulationRecords.js';
 import { AppError } from '../../utils/errors.js';

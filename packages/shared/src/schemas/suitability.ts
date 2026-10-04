@@ -7,13 +7,27 @@ import type { SuitabilityVerdict } from '../enums/domain.js';
 export const RISK_APPETITES = ['low', 'medium', 'high'] as const;
 export type RiskAppetite = (typeof RISK_APPETITES)[number];
 
-/** Decided 2026-10-04: loss tolerance is % of the amount invested, horizon is in months. */
-export const clientProfileSchema = z.strictObject({
+/**
+ * The four fields the suitability rules read. Decided 2026-10-04: loss tolerance is % of the
+ * amount invested, horizon is in months.
+ */
+export const suitabilityProfileSchema = z.strictObject({
   riskAppetite: z.enum(RISK_APPETITES),
   horizonMonths: z.number().int().min(1).max(600),
   lossTolerancePct: z.number().min(0).max(100),
   /** Share of the client's portfolio in this product, percent. */
   concentrationPct: z.number().min(0).max(100),
+});
+export type SuitabilityProfile = z.output<typeof suitabilityProfileSchema>;
+
+/**
+ * The client as the RM enters it (decided 2026-10-04: no saved profiles). Name and age are
+ * display-only: they appear on screen and in the memo and are stored with the audit record, but
+ * no suitability rule reads them and they are never sent to the AI service.
+ */
+export const clientProfileSchema = suitabilityProfileSchema.extend({
+  name: z.string().trim().min(1).max(120),
+  age: z.number().int().min(18).max(120),
 });
 export type ClientProfile = z.output<typeof clientProfileSchema>;
 
@@ -23,8 +37,6 @@ export const simulationIdSchema = z.string().trim().min(1).max(100);
 export const suitabilityRequestSchema = z.strictObject({
   simulationId: simulationIdSchema,
   profile: clientProfileSchema,
-  /** The saved profile (GET /api/client-profiles) the fields came from, if any. Links the audit record. */
-  profileId: z.uuid().optional(),
 });
 export type SuitabilityRequest = z.output<typeof suitabilityRequestSchema>;
 
@@ -58,35 +70,4 @@ export interface SuitabilityResponse {
    * database that fails returns DATABASE_ERROR instead.
    */
   persisted: boolean;
-}
-
-// ---- saved client profiles (GET/POST /api/client-profiles, GET/PUT /api/client-profiles/:id) ----
-// Approved 2026-10-03 (API_SPEC.md): supporting CRUD for reusing a profile in /suitability; not CRM
-// (no login, ownership or roles). Fields from DATABASE_SCHEMA.md. No delete (decided 2026-10-04:
-// profiles are only replaced, so audit snapshots never lose their source).
-
-export const savedProfileInputSchema = clientProfileSchema.extend({
-  /** The RM's own reference for the client (e.g. a CRM id). Never a name. Unique. */
-  clientRef: z.string().trim().min(1).max(64),
-  label: z
-    .string()
-    .trim()
-    .max(120)
-    .nullish()
-    .transform((v) => (v ? v : null)),
-});
-export type SavedProfileInput = z.output<typeof savedProfileInputSchema>;
-
-export interface SavedProfile extends ClientProfile {
-  id: string;
-  clientRef: string;
-  label: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export const profileIdSchema = z.uuid();
-
-export interface SavedProfileList {
-  profiles: SavedProfile[];
 }

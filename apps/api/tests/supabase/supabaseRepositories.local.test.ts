@@ -61,6 +61,52 @@ describe.skipIf(!enabled)('Supabase adapter (local database)', () => {
   });
 });
 
+describe.skipIf(!enabled)('schema after the client-profile removal (local database)', () => {
+  it('has no client_profiles table and no simulations.profile_id column', async () => {
+    const t = await pool!.query("select to_regclass('public.client_profiles') as t");
+    expect((t.rows[0] as { t: string | null }).t).toBeNull();
+    const c = await pool!.query(
+      "select 1 from information_schema.columns where table_name = 'simulations' and column_name = 'profile_id'",
+    );
+    expect(c.rowCount).toBe(0);
+  });
+
+  it('writes nothing when a simulation cannot be recorded', async () => {
+    await resetLocalDatabase();
+    const repos = createSupabaseRepositories(createSupabaseClient(config.database));
+    const err = await repos.simulations
+      .record({
+        mode: 'B',
+        configurationId: '00000000-0000-4000-8000-000000000000',
+        profileSnapshot: null,
+        levelValue: 25_000,
+        levelSource: 'manual',
+        levelAsOf: null,
+        shockPct: -10,
+        shockedLevel: 22_500,
+        riskResults: [
+          {
+            scenario: 'shock',
+            percentile: null,
+            terminal: 22_500,
+            pathMin: null,
+            payoff: 1,
+            returnPct: 0,
+            lossAmount: 0,
+            knockedIn: null,
+            details: {},
+          },
+        ],
+      })
+      .catch((e: unknown) => e);
+    expect((err as { kind?: string }).kind).toBe('invalid_reference');
+    const n = await pool!.query(
+      'select (select count(*) from simulations) as sims, (select count(*) from risk_results) as risks',
+    );
+    expect(n.rows[0]).toEqual({ sims: '0', risks: '0' });
+  });
+});
+
 describe.skipIf(!enabled)('persistence through the app (local database)', () => {
   runPersistenceFlow(config);
 });

@@ -4,6 +4,25 @@ import { expect, test, type Page } from '@playwright/test';
 
 const stage = (page: Page, name: RegExp) => page.getByRole('button', { name }).first().click();
 
+/** Opens the app past the landing page and enters the client (name and age are required to run). */
+async function startJourney(
+  page: Page,
+  client: { name: string; age: string } | null = {
+    name: 'E2E Client',
+    age: '52',
+  },
+) {
+  await page.goto('/');
+  await page
+    .getByRole('button', { name: /Start New Mandate/ })
+    .first()
+    .click();
+  if (client) {
+    await page.getByLabel('Client name').fill(client.name);
+    await page.getByLabel('Client age').fill(client.age);
+  }
+}
+
 async function runSimulation(page: Page) {
   await page.getByRole('button', { name: /Run simulation/ }).click();
   await expect(page.getByRole('button', { name: /Run simulation/ })).toBeEnabled({
@@ -12,7 +31,7 @@ async function runSimulation(page: Page) {
 }
 
 test('ELN Mode B: payoff, scenarios, verdict, explanation and chat', async ({ page }) => {
-  await page.goto('/');
+  await startJourney(page);
   await expect(page.getByRole('heading', { name: /Capture the client mandate/ })).toBeVisible();
 
   await stage(page, /3\. Simulate/);
@@ -38,7 +57,7 @@ test('ELN Mode B: payoff, scenarios, verdict, explanation and chat', async ({ pa
 test('ELN Mode A: fan chart with price history, risk panel, model card and payoff curve', async ({
   page,
 }) => {
-  await page.goto('/');
+  await startJourney(page);
   await stage(page, /3\. Simulate/);
   await page.getByRole('radio', { name: /Mode A/ }).click();
   await runSimulation(page);
@@ -53,7 +72,7 @@ test('ELN Mode A: fan chart with price history, risk panel, model card and payof
 });
 
 test('DCD Mode A: FX forecast through the DCD engine', async ({ page }) => {
-  await page.goto('/');
+  await startJourney(page);
   await page.getByRole('radio', { name: 'DCD' }).first().click();
   await stage(page, /3\. Simulate/);
   await page.getByRole('radio', { name: /Mode A/ }).click();
@@ -65,35 +84,24 @@ test('DCD Mode A: FX forecast through the DCD engine', async ({ page }) => {
   await expect(page.getByText('Strike 84.5').first()).toBeAttached();
 });
 
-test.describe('saved client profiles', () => {
-  test.skip(!process.env.SUPABASE_TEST_URL, 'needs a local Supabase');
+test('the run waits for the client name and age, then records both with the verdict', async ({
+  page,
+}) => {
+  await startJourney(page, null);
+  await stage(page, /3\. Simulate/);
+  await page.getByLabel(/Starting level \(S/).fill('25000');
+  await expect(page.getByRole('button', { name: /Run simulation/ })).toBeDisabled();
+  await expect(page.getByText('Enter the client name.')).toBeVisible();
 
-  test('save, load and link a profile to the recorded verdict', async ({ page }) => {
-    const ref = `E2E-${Date.now()}`;
-    await page.goto('/');
-    await page.getByLabel('Client reference').fill(ref);
-    await page.getByLabel('Profile label').fill('Browser test');
-    await page.getByRole('button', { name: /^Save profile/ }).click();
-    await expect(page.getByText(`Saved ${ref}.`)).toBeVisible();
+  await stage(page, /1\. Mandate/);
+  await expect(page.getByLabel('Saved profile')).toHaveCount(0);
+  await page.getByLabel('Client name').fill('Asha Rao');
+  await page.getByLabel('Client age').fill('52');
+  await stage(page, /3\. Simulate/);
+  await runSimulation(page);
 
-    await page.reload();
-    const select = page.getByLabel('Saved profile');
-    await select.selectOption({ label: `${ref} · Browser test` });
-    await page.getByRole('button', { name: /Load saved profile/ }).click();
-    await expect(page.getByLabel('Client reference')).toHaveValue(ref);
-
-    await stage(page, /3\. Simulate/);
-    await page.getByLabel(/Starting level \(S/).fill('25000');
-    await runSimulation(page);
-    await stage(page, /5\. Verdict/);
-    await expect(page.getByText('Recorded in the audit database with this profile.')).toBeVisible();
-  });
-});
-
-test('saved profiles report a missing database clearly', async ({ page }) => {
-  test.skip(!!process.env.SUPABASE_TEST_URL, 'database is configured');
-  await page.goto('/');
+  await stage(page, /5\. Verdict/);
   await expect(
-    page.getByText(/Saved profiles unavailable \(DATABASE_NOT_CONFIGURED\)/),
+    page.getByText(/Not recorded: the database is not configured|Recorded in the audit database/),
   ).toBeVisible();
 });

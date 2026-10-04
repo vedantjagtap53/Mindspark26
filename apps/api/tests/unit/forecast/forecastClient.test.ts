@@ -41,7 +41,7 @@ describe('forecast client', () => {
     const f = await client(fetchImpl).forecast(input);
     expect(f.horizon.tradingDays).toBe(126);
     expect(seen?.url).toBe('https://ai.example/forecast');
-    expect(JSON.parse(seen?.init.body as string)).toEqual({ ...input, trainingWindowYears: 10 });
+    expect(JSON.parse(seen?.init.body as string)).toEqual({ ...input, trainingWindowYears: 3 });
     expect((seen?.init.headers as Record<string, string>).authorization).toBe('Bearer k');
   });
 

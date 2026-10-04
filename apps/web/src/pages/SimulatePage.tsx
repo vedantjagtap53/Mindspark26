@@ -10,6 +10,7 @@ interface Props {
   run: RunSettings;
   onRun: (r: RunSettings) => void;
   termIssueCount: number;
+  profileIssue: string | null;
   loading: boolean;
   elapsedSeconds: number;
   onExecute: () => void;

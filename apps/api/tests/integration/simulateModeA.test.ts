@@ -62,18 +62,28 @@ describe('POST /api/simulate — Mode A', () => {
   it('asks the forecast service for the product underlying, tenor and window', async () => {
     const { client, calls } = fakeForecast();
     await post(
-      { mode: 'A', productType: 'ELN', terms: eln, trainingWindowYears: 5 },
+      { mode: 'A', productType: 'ELN', terms: eln, trainingWindowYears: 1.5 },
       appWith(client),
     );
     expect(calls).toEqual([
-      { underlying, tenorDays: 182, trainingWindowYears: 5, samplePathCount: 500 },
+      { underlying, tenorDays: 182, trainingWindowYears: 1.5, samplePathCount: 500 },
     ]);
   });
 
-  it('defaults the training window to 10 years', async () => {
+  it('defaults the training window to 3 years', async () => {
     const { client, calls } = fakeForecast();
     await post({ mode: 'A', productType: 'CPN', terms: cpn }, appWith(client));
-    expect(calls[0]?.trainingWindowYears).toBe(10);
+    expect(calls[0]?.trainingWindowYears).toBe(3);
+  });
+
+  it.each([30 / 365, 0.5, 2.4, 3])('accepts a training window of %s years', async (years) => {
+    const { client, calls } = fakeForecast();
+    const res = await post(
+      { mode: 'A', productType: 'ELN', terms: eln, trainingWindowYears: years },
+      appWith(client),
+    );
+    expect(res.status).toBe(200);
+    expect(calls[0]?.trainingWindowYears).toBe(years);
   });
 
   it('ELN: runs the engine on each case path', async () => {
@@ -129,7 +139,7 @@ describe('POST /api/simulate — Mode A', () => {
     expect(body.model).toMatchObject({
       name: 'garch11-t-montecarlo',
       simulations: 10000,
-      trainingWindowYears: 10,
+      trainingWindowYears: 3,
       trainingStart: '2016-10-03',
       trainingEnd: '2026-10-02',
     });
@@ -264,7 +274,9 @@ describe('POST /api/simulate — Mode A errors', () => {
   });
 
   it.each([
-    ['an invalid training window', { trainingWindowYears: 7 }],
+    ['a training window above 3 years', { trainingWindowYears: 5 }],
+    ['a training window below 30 days', { trainingWindowYears: 29 / 365 }],
+    ['a non-numeric training window', { trainingWindowYears: '10' }],
     ['a Mode B shock', { shockPct: -10 }],
     ['a Mode B level', { level: { source: 'manual', value: 25_000 } }],
   ])('rejects %s', async (_name, extra) => {

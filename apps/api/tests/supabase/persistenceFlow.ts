@@ -1,9 +1,9 @@
-// The full app (simulate → suitability → explain, and /client-profiles) writing through the real
+// The full app (simulate → suitability → explain) writing through the real
 // Supabase adapter. Run from supabaseRepositories.local.test.ts so it never overlaps the contract
 // suite, which empties the tables between tests.
 import request from 'supertest';
 import { expect, it } from 'vitest';
-import type { SavedProfile, SimulateModeAResponse, SuitabilityResponse } from '@mindspark/shared';
+import type { SimulateModeAResponse, SuitabilityResponse } from '@mindspark/shared';
 import { createApp } from '../../src/app.js';
 import type { AppConfig } from '../../src/config/index.js';
 import { createSupabaseClient } from '../../src/repositories/supabase/supabaseClient.js';
@@ -40,24 +40,21 @@ const forecast: ForecastClient = {
 };
 
 export function runPersistenceFlow(config: AppConfig) {
-  it('stores profile, Mode A simulation, verdict and explanation', async () => {
+  it('stores the Mode A simulation with the client, the verdict and the explanation', async () => {
     // No repositories injected: the app builds the Supabase adapter from its config.
     const app = createApp(config, silentLogger, {
       marketData: createMarketDataService({}),
       rag,
       forecast,
     });
-    const ref = `E2E-${Date.now()}`;
-    const created = await request(app).post('/api/client-profiles').send({
-      clientRef: ref,
-      label: null,
+    const client = {
+      name: `Test Client ${Date.now()}`,
+      age: 52,
       riskAppetite: 'high',
       horizonMonths: 24,
       lossTolerancePct: 30,
       concentrationPct: 10,
-    });
-    expect(created.status).toBe(201);
-    const profile = created.body as SavedProfile;
+    };
 
     const sim = await request(app)
       .post('/api/simulate')
@@ -79,28 +76,25 @@ export function runPersistenceFlow(config: AppConfig) {
 
     const suit = await request(app)
       .post('/api/suitability')
-      .send({
-        simulationId,
-        profileId: profile.id,
-        profile: {
-          riskAppetite: 'high',
-          horizonMonths: 24,
-          lossTolerancePct: 30,
-          concentrationPct: 10,
-        },
-      });
+      .send({ simulationId, profile: client });
     expect(suit.status).toBe(200);
     expect((suit.body as SuitabilityResponse).persisted).toBe(true);
     expect((await request(app).post('/api/explain').send({ simulationId })).status).toBe(200);
 
-    const repos = createSupabaseRepositories(createSupabaseClient(config.database));
-    const [summary] = await repos.simulations.listForProfile(profile.id, 5);
-    const record = await repos.simulations.getById(summary!.id);
+    // The newest simulation row is the one this test just wrote.
+    const db = createSupabaseClient(config.database);
+    const { data: latest } = await db
+      .from('simulations')
+      .select('id')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    const repos = createSupabaseRepositories(db);
+    const record = await repos.simulations.getById((latest as { id: string }).id);
     expect(record).toMatchObject({
       mode: 'A',
-      trainingWindowYears: 10,
-      profileId: profile.id,
-      profileSnapshot: { clientRef: ref, lossTolerancePct: 30 },
+      trainingWindowYears: 3,
+      profileSnapshot: client,
       suitability: { verdict: (suit.body as SuitabilityResponse).verdict },
       forecastMeta: { contractVersion: '1.0', backtest: { bandCoverage: 0.88 } },
     });

@@ -15,13 +15,13 @@ One user: the **RM**. No client login, no admin role.
 | **DCD** (dual currency deposit) | Short-term deposit with high rate; may be repaid in the alternate currency if it weakens past strike. | Currency pair, deposit amount, tenor, strike rate, enhanced rate |
 | **CPN** (capital-protected note) | Protected floor plus partial upside participation. | Underlying, notional, tenor, protection %, participation %, optional cap |
 
-**Tenor** is entered in calendar days. Allowed range: **30 to 1,095 days** (1 month to 3 years) for all products. Longer tenors are rejected because the forecast model is trained on at most 10 years of history.
+**Tenor** is entered in calendar days. Allowed range: **30 to 1,095 days** (1 month to 3 years) for all products. The Mode A training window is independently configurable from 30 days to 3 years (see §7.3).
 
 ## 4. User Flow
 1. RM lands on the **dashboard** showing three product cards: ELN, DCD, CPN.
 2. RM selects a card and opens the configuration screen.
 3. RM enters product terms (see table above), including any tenor in the allowed range.
-4. RM enters or loads the **client profile**: risk appetite, investment horizon, loss tolerance, concentration (share of portfolio in this product or underlying).
+4. RM enters the **client profile for this simulation**: name, age, risk appetite, investment horizon, loss tolerance and concentration (share of portfolio in this product or underlying). Client profiles are not saved or loaded.
 5. RM picks a simulation mode:
    - **Mode A:** ML forecast. A statistical model trained on the underlying's historical data simulates many possible price paths over the chosen tenor and returns a **low, base and high case** (5th, 50th and 95th percentile). The product is run on all three cases.
    - **Mode B:** manual shock on the live underlying level (-10%, 0%, +x%).
@@ -33,7 +33,7 @@ One user: the **RM**. No client login, no admin role.
 ```mermaid
 flowchart TB
   A["1. RM selects product<br/>ELN / DCD / CPN"] --> B["2. Enter underlying, tenor,<br/>strike, barrier, coupon"]
-  B --> C["3. Enter / load client profile"]
+  B --> C["3. Enter client profile for this simulation"]
   C --> D{"Simulation mode?"}
   D -->|"Mode A"| E["Mode A: GARCH Monte Carlo<br/>simulate paths over the tenor<br/>low / base / high = P5 / P50 / P95"]
   D -->|"Mode B"| F["Mode B: manual shock<br/>-10%, 0%, +x% on live underlying level"]
@@ -94,13 +94,13 @@ flowchart TB
 ### 7.1 Frontend
 - Dashboard with three product cards.
 - Product-specific configuration form with validation (for example barrier below strike, tenor between 30 and 1,095 days, positive notional).
-- Client profile form, with the option to load a saved profile.
-- Simulation mode selector (A or B), plus a shock input for Mode B (presets and custom %).
+- Client profile form for each simulation: name, age (18–120), risk appetite, investment horizon, loss tolerance and concentration. Name and age are display-only; saved profiles are not supported.
+- Simulation mode selector (A or B), a Mode A training-window selector (30 days to 3 years, default 3 years), and a shock input for Mode B (presets and custom %).
 - Results view:
   - Payoff-at-maturity chart across a range of underlying levels, with strike, barrier and breakeven marked.
   - Scenario comparison table (for example -25%, -10%, 0%, +15%) showing payoff in currency and %.
   - Mode A: **forecast fan chart** showing recent history, the P5–P95 band, the base (median) line, the low/base/high case paths, and the barrier and strike levels.
-  - Mode A: **model card** showing training window (e.g. "Trained on Oct 2016 – Oct 2026"), model name, and backtest results (band coverage and base-case error vs a no-change forecast).
+  - Mode A: **model card** showing training window (e.g. "Trained on Oct 2023 – Oct 2026"), model name, and backtest results (band coverage and base-case error vs a no-change forecast).
   - Risk panel: payoff and return in the base, low and high cases, and whether the barrier is knocked in in each. In Mode A also show **probability of loss** and, for ELN, **probability of knock-in** across simulated paths.
   - Suitability badge (**Suitable / Caution / Not suitable**) with the specific flags listed.
   - Plain-language explanation panel and chat box.
@@ -134,7 +134,7 @@ Owned by the AI/ML developer as a separate service. The method below is the agre
 | Aspect | Decision |
 |---|---|
 | Data | Daily closes of the underlying (Nifty 50: `^NSEI`). |
-| Training window | **10 years by default**, 5 years optional. COVID-era data (2020) is **kept**; removing crash periods is not allowed. Shorter windows (3–5 years) may be used for single stocks after major corporate events. |
+| Training window | RM-selectable from **30 days to 3 years**, default 3 years. Use the contiguous history in the selected window; do not selectively remove periods within it. The fractional-years range is part of the approved forecast contract. |
 | Target | Daily log returns `ln(P_t / P_{t-1})`, never raw prices. |
 | Model | GARCH(1,1) with Student-t errors on daily returns. |
 | Drift | Historical mean over the training window, or a fixed documented assumption; the choice is returned in the response. |
@@ -175,7 +175,7 @@ No promised returns, no advice beyond the computed verdict, risk wording always 
 - Mode A backtest band coverage for Nifty 50 is between 80% and 95% for the 90% band at 3-, 6- and 12-month horizons.
 
 ## 10. Changes from v1
-- Mode A method fixed: GARCH(1,1) Monte Carlo on log returns, 10-year default window including COVID, P5/P50/P95 cases.
+- Mode A method fixed: GARCH(1,1) Monte Carlo on log returns, RM-selectable 30-day-to-3-year training window (3-year default), P5/P50/P95 cases.
 - Tenor range set to 30–1,095 calendar days and the tenor-to-trading-days rule defined.
 - Mode A cases are full daily paths, so American barriers are checked on the path.
 - Added Mode A distribution metrics (probability of loss and of knock-in), the fan chart and model card.

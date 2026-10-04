@@ -8,9 +8,13 @@ export const TENOR_DAYS_MAX = 1095;
 export const TRADING_DAYS_PER_YEAR = 252;
 export const CALENDAR_DAYS_PER_YEAR = 365;
 
-export const TRAINING_WINDOW_YEARS = [5, 10] as const;
-export type TrainingWindowYears = (typeof TRAINING_WINDOW_YEARS)[number];
-export const DEFAULT_TRAINING_WINDOW_YEARS: TrainingWindowYears = 10;
+/** Training window chosen by the RM (requested 2026-10-04): 30 days to 3 years, sent as years. */
+export const TRAINING_WINDOW_DAYS_MIN = 30;
+export const TRAINING_WINDOW_DAYS_MAX = 1095;
+export const TRAINING_WINDOW_YEARS_MIN = TRAINING_WINDOW_DAYS_MIN / CALENDAR_DAYS_PER_YEAR;
+export const TRAINING_WINDOW_YEARS_MAX = TRAINING_WINDOW_DAYS_MAX / CALENDAR_DAYS_PER_YEAR;
+export type TrainingWindowYears = number;
+export const DEFAULT_TRAINING_WINDOW_YEARS: TrainingWindowYears = TRAINING_WINDOW_YEARS_MAX;
 
 export const SAMPLE_PATH_COUNT_MIN = 100;
 export const SAMPLE_PATH_COUNT_MAX = 2000;

@@ -2,7 +2,6 @@
 import { Compass } from 'lucide-react';
 import type { ProfileForm, RiskAppetite } from '../../state/forms';
 import { Field, Segmented, TextInput, Tile } from '../ui';
-import { SavedProfiles } from './SavedProfiles';
 
 interface Props {
   profile: ProfileForm;
@@ -75,25 +74,22 @@ export function ClientProfileForm({ profile, onChange }: Props) {
         </div>
       </div>
 
-      <SavedProfiles profile={profile} onChange={onChange} />
-
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="Client reference" htmlFor="client-ref" hint="Internal reference, not a name.">
+        <Field label="Client name" htmlFor="client-name">
           <TextInput
-            id="client-ref"
-            value={profile.clientRef}
-            onChange={(v) => onChange({ ...profile, clientRef: v, profileId: null })}
-            placeholder="e.g. CL-0042"
-            maxLength={64}
+            id="client-name"
+            value={profile.name}
+            onChange={(v) => set('name', v)}
+            placeholder="e.g. Asha Rao"
+            maxLength={120}
           />
         </Field>
-        <Field label="Profile label" htmlFor="client-label">
+        <Field label="Client age" htmlFor="client-age">
           <TextInput
-            id="client-label"
-            value={profile.label}
-            onChange={(v) => set('label', v)}
-            placeholder="e.g. Retirement portfolio"
-            maxLength={120}
+            id="client-age"
+            value={String(profile.age)}
+            onChange={(v) => set('age', Number(v.replace(/\D/g, '')) || 0)}
+            maxLength={3}
           />
         </Field>
       </div>

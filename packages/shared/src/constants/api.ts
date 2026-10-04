@@ -8,5 +8,4 @@ export const API_ROUTES = {
   suitability: '/suitability',
   explain: '/explain',
   chat: '/chat',
-  clientProfiles: '/client-profiles',
 } as const;

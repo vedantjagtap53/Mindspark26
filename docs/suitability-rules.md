@@ -18,18 +18,18 @@ Inputs: product risk metrics from the payoff and risk engine, plus the client pr
 
 - **Verdict mapping:** any hard flag gives **Not suitable**. Otherwise, any other flag gives **Caution**. No flags gives **Suitable**. Every raised flag is listed as a reason, whatever the verdict.
 - **Product risk ratings (fixed):** CPN **Low**, DCD **High**, ELN **High**.
-- **Saved client profiles:** client profiles are persisted and served by `/api/client-profiles` (see `API_SPEC.md`).
+- **Client details:** the RM enters the client for each run (decided 2026-10-04: no saved profiles). **Name and age are display-only**: no rule reads them, so the verdict is identical whatever they are; they are stored with the audit record and never sent to the AI service.
 
 ## Decisions (Karan, 2026-10-04) — implemented in `apps/api/src/engines/suitability/`
 
-| Rule | Flag | Severity |
-| --- | --- | --- |
-| Low-case loss above loss tolerance | `low_case_loss` | **Hard** (Not suitable) |
-| ELN barrier knocked in in the low or base case | `barrier_knock_in` | Caution |
-| Tenor longer than the horizon (`horizonMonths × 365/12` days) | `tenor_vs_horizon` | Caution |
-| Concentration above the limit (fixed, default 25%, `SUITABILITY_CONCENTRATION_LIMIT_PCT`) | `concentration` | Caution |
-| High-risk product (ELN, DCD) for a **low** risk appetite | `risk_vs_appetite` | **Hard** |
-| High-risk product for a **medium** risk appetite | `risk_vs_appetite` | Caution |
+| Rule                                                                                      | Flag               | Severity                |
+| ----------------------------------------------------------------------------------------- | ------------------ | ----------------------- |
+| Low-case loss above loss tolerance                                                        | `low_case_loss`    | **Hard** (Not suitable) |
+| ELN barrier knocked in in the low or base case                                            | `barrier_knock_in` | Caution                 |
+| Tenor longer than the horizon (`horizonMonths × 365/12` days)                             | `tenor_vs_horizon` | Caution                 |
+| Concentration above the limit (fixed, default 25%, `SUITABILITY_CONCENTRATION_LIMIT_PCT`) | `concentration`    | Caution                 |
+| High-risk product (ELN, DCD) for a **low** risk appetite                                  | `risk_vs_appetite` | **Hard**                |
+| High-risk product for a **medium** risk appetite                                          | `risk_vs_appetite` | Caution                 |
 
 - Risk-appetite scale: `low`, `medium`, `high`. CPN (Low risk) never raises the risk flag.
 - Units: loss tolerance and concentration are percent; loss tolerance is relative to the amount invested; horizon is in months.

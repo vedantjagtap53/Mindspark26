@@ -2,29 +2,27 @@
 
 Base path: `/api`
 
-| Method    | Path                   | Responsibility                                                                                   |
-| --------- | ---------------------- | ------------------------------------------------------------------------------------------------ |
-| GET       | `/health`              | Operational: liveness, environment and database configuration status (no secrets).               |
-| POST      | `/configure`           | Validate and normalize a product configuration.                                                  |
-| POST      | `/simulate`            | Run deterministic payoff and risk calculations from Mode A forecast output or Mode B shock data. |
-| POST      | `/suitability`         | Apply deterministic suitability rules.                                                           |
-| POST      | `/explain`             | Send calculated context to the external AI explanation capability.                               |
-| POST      | `/chat`                | Send simulation-grounded questions to the external AI chat capability.                           |
-| GET, POST | `/client-profiles`     | List saved client profiles; create one.                                                          |
-| GET, PUT  | `/client-profiles/:id` | Read or update one saved client profile.                                                         |
-| WebSocket | `/live`                | Live prices for display, relayed from the backend's market-data feed (added 2026-10-04).         |
+| Method    | Path           | Responsibility                                                                                   |
+| --------- | -------------- | ------------------------------------------------------------------------------------------------ |
+| GET       | `/health`      | Operational: liveness, environment and database configuration status (no secrets).               |
+| POST      | `/configure`   | Validate and normalize a product configuration.                                                  |
+| POST      | `/simulate`    | Run deterministic payoff and risk calculations from Mode A forecast output or Mode B shock data. |
+| POST      | `/suitability` | Apply deterministic suitability rules.                                                           |
+| POST      | `/explain`     | Send calculated context to the external AI explanation capability.                               |
+| POST      | `/chat`        | Send simulation-grounded questions to the external AI chat capability.                           |
+| WebSocket | `/live`        | Live prices for display, relayed from the backend's market-data feed (added 2026-10-04).         |
 
 ## `POST /suitability`, `/explain`, `/chat` (built 2026-10-04)
 
 Every `/simulate` response carries a `simulationId`. The backend keeps the run (request, results, then profile, verdict and explanation) in API memory as working state for suitability, explain and chat; ids are lost on restart and expire after 12 hours (`NOT_FOUND`). The browser never sends results back.
 
-**Persistence (2026-10-04).** When Supabase is configured, `/suitability` writes the audit record before answering: the product configuration (once per run), the simulation with its risk results and a frozen profile snapshot, linked to the saved profile when `profileId` is sent, and the verdict with its flags and `rulesVersion`. `/explain` then stores the explanation against that record. Sample paths and the fan are never stored. A database failure fails the request (`DATABASE_ERROR`, 500); nothing is written anywhere else. Without a configured database (development, tests) nothing is persisted and the response says `persisted: false`. A second `/suitability` call for the same run writes a new simulation record for the new profile.
+**Persistence (2026-10-04).** When Supabase is configured, `/suitability` writes the audit record before answering: the product configuration (once per run), the simulation with its risk results and a frozen snapshot of the client as entered (name, age and the four rule fields), and the verdict with its flags and `rulesVersion`. `/explain` then stores the explanation against that record. Sample paths and the fan are never stored. A database failure fails the request (`DATABASE_ERROR`, 500); nothing is written anywhere else. Without a configured database (development, tests) nothing is persisted and the response says `persisted: false`. A second `/suitability` call for the same run writes a new simulation record for the new client.
 
-- `/suitability` — request `{ simulationId, profile: { riskAppetite: "low"|"medium"|"high", horizonMonths, lossTolerancePct, concentrationPct }, profileId? }` (`profileId`: a saved profile's id, added 2026-10-04 to link the audit record; unknown id → `NOT_FOUND`); response `{ simulationId, verdict, flags: [{ rule, severity: "caution"|"not_suitable", message }], lowCase: { label, returnPct, knockedIn }, productRiskRating, persisted }`. Rules: `docs/suitability-rules.md`.
+- `/suitability` — request `{ simulationId, profile: { name (1–120 chars), age (whole number, 18–120), riskAppetite: "low"|"medium"|"high", horizonMonths, lossTolerancePct, concentrationPct } }` (unknown fields are rejected; name and age are display-only: no rule reads them, they are stored with the audit record, and they are never sent to the AI service); response `{ simulationId, verdict, flags: [{ rule, severity: "caution"|"not_suitable", message }], lowCase: { label, returnPct, knockedIn }, productRiskRating, persisted }`. Rules: `docs/suitability-rules.md`.
 - `/explain` — request `{ simulationId }` (after `/suitability`, otherwise `VALIDATION_ERROR`); response `{ simulationId, verdict, sections: { whatItIs, bestCase, worstCase, lossTriggers, suitabilityReasoning }, riskNotice, checksPassed, ungroundedNumbers, sources, model }`.
 - `/chat` — request `{ simulationId, question (1–1,000 chars), history: [{ role: "user"|"assistant", content }] (≤ 40) }`; response `{ simulationId, answer, scope: "in_scope"|"out_of_scope", checksPassed, riskNote, sources, model }`.
 
-Explain and chat call the AI service (`services/rag`, `POST {RAG_API_URL}/explain` and `/chat`, header `X-API-Key: RAG_API_KEY`) with its `SimulationContext`: product terms, the four profile fields, the computed cases (Mode A low/base/high plus distribution and model card; Mode B the scenario shocks and the RM's shock) and the verdict with flags. No client reference or name is sent. The reply is validated; an explanation naming a different verdict or simulation is rejected (`AI_INVALID_RESPONSE`, 502). Service not configured, unreachable or non-2xx → `AI_UNAVAILABLE` (503).
+Explain and chat call the AI service (`services/rag`, `POST {RAG_API_URL}/explain` and `/chat`, header `X-API-Key: RAG_API_KEY`) with its `SimulationContext`: product terms, the four profile fields, the computed cases (Mode A low/base/high plus distribution and model card; Mode B the scenario shocks and the RM's shock) and the verdict with flags. The client's name and age are never sent. The reply is validated; an explanation naming a different verdict or simulation is rejected (`AI_INVALID_RESPONSE`, 502). Service not configured, unreachable or non-2xx → `AI_UNAVAILABLE` (503).
 
 ## WebSocket `/live`
 
@@ -34,11 +32,7 @@ Requested by Karan on 2026-10-04 (live ticker in the UI). The browser never conn
 - Server sends `{ "type": "subscribed", "symbol", "provider" }`, then `{ "type": "tick", "symbol", "price", "asOf" }` for each trade (none while the market is closed), or `{ "type": "error", "code", "message" }` (`MARKET_DATA_UNAVAILABLE` when no feed is configured or the symbol is not covered, `VALIDATION_ERROR` for a bad message).
 - Upgrade requests on any other path are refused.
 
-`/client-profiles` was approved by Karan on 2026-10-03 so the RM can reuse client profiles in `/suitability`. It is supporting CRUD, not CRM: no login, ownership or roles. Built 2026-10-04 on the decided database fields (`DATABASE_SCHEMA.md`); no delete.
-
-- Body (POST, PUT): `{ clientRef (1–64 chars, unique, never a name), label? (≤ 120 chars or null), riskAppetite, horizonMonths, lossTolerancePct, concentrationPct }` (same ranges as `/suitability`'s profile). Unknown fields are rejected. PUT replaces every field.
-- Responses: a profile is `{ id, clientRef, label, riskAppetite, horizonMonths, lossTolerancePct, concentrationPct, createdAt, updatedAt }`; POST returns 201; `GET /client-profiles?limit=1..100&offset=0..` (default 50) returns `{ profiles }`, most recently updated first.
-- Errors: `VALIDATION_ERROR` (400, including a non-UUID id), `NOT_FOUND` (404), `CONFLICT` (409, duplicate `clientRef`), `DATABASE_NOT_CONFIGURED` (503), `DATABASE_ERROR` (500).
+**Saved client profiles removed (2026-10-04).** `/client-profiles` (GET, POST, PUT) and the optional `profileId` on `/suitability` were removed at Karan's request: the RM enters the client (name, age, risk appetite, horizon, loss tolerance, concentration) for each run, and there is nothing to load or save. These paths now return `NOT_FOUND`, and a `/suitability` body with `profileId` is rejected as an unknown field (`VALIDATION_ERROR`). The whole-number age limits (18–120) were confirmed by Karan on 2026-10-04.
 
 ## `POST /configure`
 

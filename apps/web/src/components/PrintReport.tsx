@@ -93,9 +93,9 @@ export function PrintReport({ run, onClose }: Props) {
                 Client profile
               </span>
               <div className="font-semibold text-sm">
-                {run.profile.clientRef || 'No client reference'}
-                {run.profile.label && ` · ${run.profile.label}`}
+                {run.profile.name || 'No client name'}
               </div>
+              <div>Age: {run.profile.age || '—'}</div>
               <div>Risk appetite: {run.profile.riskAppetite}</div>
               <div>Horizon: {run.profile.horizonMonths} months</div>
               <div>Loss tolerance: {run.profile.lossTolerancePct}%</div>

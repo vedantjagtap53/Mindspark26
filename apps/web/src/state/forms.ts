@@ -1,6 +1,12 @@
 // Form state for the RM journey and the request bodies built from it. No financial maths here:
 // the backend validates every field and computes every result.
 
+import {
+  CALENDAR_DAYS_PER_YEAR,
+  TRAINING_WINDOW_DAYS_MAX,
+  TRAINING_WINDOW_DAYS_MIN,
+} from '@mindspark/shared';
+
 export type ProductType = 'ELN' | 'DCD' | 'CPN';
 export type RiskAppetite = 'low' | 'medium' | 'high';
 export type Mode = 'A' | 'B';
@@ -38,12 +44,10 @@ export interface CpnForm {
   capPct: number;
 }
 
-/** Decided profile fields (DATABASE_SCHEMA.md). Saved profiles live behind /api/client-profiles. */
+/** Client information is captured with each suitability assessment; profiles are not saved. */
 export interface ProfileForm {
-  /** Id of the saved profile these fields were loaded from or saved as; null for an ad hoc profile. */
-  profileId: string | null;
-  clientRef: string;
-  label: string;
+  name: string;
+  age: number;
   riskAppetite: RiskAppetite;
   horizonMonths: number;
   lossTolerancePct: number;
@@ -56,7 +60,8 @@ export interface RunSettings {
   levelSource: LevelSourceChoice;
   /** RM-entered starting level (S_0, or FX spot for DCD); null until entered. */
   manualLevel: number | null;
-  trainingWindowYears: 5 | 10;
+  /** Mode A training window, in days: 30 to 1,095 (3 years). Sent to the API as years. */
+  trainingWindowDays: number;
 }
 
 export interface Forms {
@@ -98,29 +103,36 @@ export const DEFAULT_FORMS: Forms = {
 };
 
 export const DEFAULT_PROFILE: ProfileForm = {
-  profileId: null,
-  clientRef: '',
-  label: '',
+  name: '',
+  age: 30,
   riskAppetite: 'medium',
   horizonMonths: 12,
   lossTolerancePct: 10,
   concentrationPct: 15,
 };
 
-/** The profile fields the suitability rules use (the reference and label are not sent to /suitability). */
+/** The client snapshot submitted with the suitability assessment. */
 export const clientProfile = (p: ProfileForm) => ({
+  name: p.name.trim(),
+  age: p.age,
   riskAppetite: p.riskAppetite,
   horizonMonths: p.horizonMonths,
   lossTolerancePct: p.lossTolerancePct,
   concentrationPct: p.concentrationPct,
 });
 
+/** The slider's limits, from the shared contract. */
+export const TRAINING_WINDOW_RANGE = {
+  min: TRAINING_WINDOW_DAYS_MIN,
+  max: TRAINING_WINDOW_DAYS_MAX,
+} as const;
+
 export const DEFAULT_RUN: RunSettings = {
   mode: 'B',
   shockPct: -10,
   levelSource: 'manual',
   manualLevel: null,
-  trainingWindowYears: 10,
+  trainingWindowDays: TRAINING_WINDOW_DAYS_MAX,
 };
 
 /** The `terms` object exactly as POST /api/configure and /api/simulate expect it. */
@@ -163,6 +175,13 @@ export const configureRequest = (product: ProductType, forms: Forms) => ({
   terms: termsFor(product, forms),
 });
 
+/** Why the client is incomplete, or null when name and age are entered. Range checks stay on the server. */
+export function profileBlocker(p: ProfileForm): string | null {
+  if (p.name.trim() === '') return 'Enter the client name.';
+  if (!(p.age > 0)) return 'Enter the client age.';
+  return null;
+}
+
 /** Why a run cannot be sent yet, or null when it can. The browser only checks for missing input. */
 export function runBlocker(product: ProductType, run: RunSettings): string | null {
   const missingLevel = run.manualLevel === null || !(run.manualLevel > 0);
@@ -198,7 +217,8 @@ export function runSettingsFor(from: ProductType, to: ProductType, run: RunSetti
 export function simulateRequest(product: ProductType, forms: Forms, run: RunSettings) {
   const terms = termsFor(product, forms);
   if (run.mode === 'A') {
-    return { mode: 'A', productType: product, terms, trainingWindowYears: run.trainingWindowYears };
+    const trainingWindowYears = run.trainingWindowDays / CALENDAR_DAYS_PER_YEAR;
+    return { mode: 'A', productType: product, terms, trainingWindowYears };
   }
   const level =
     run.levelSource === 'manual'
@@ -206,28 +226,3 @@ export function simulateRequest(product: ProductType, forms: Forms, run: RunSett
       : { source: run.levelSource };
   return { mode: 'B', productType: product, terms, shockPct: run.shockPct, level };
 }
-
-/** The body of POST/PUT /api/client-profiles. */
-export const savedProfileBody = (p: ProfileForm) => ({
-  ...clientProfile(p),
-  clientRef: p.clientRef.trim(),
-  label: p.label.trim() || null,
-});
-
-export const profileFromSaved = (s: {
-  id: string;
-  clientRef: string;
-  label: string | null;
-  riskAppetite: RiskAppetite;
-  horizonMonths: number;
-  lossTolerancePct: number;
-  concentrationPct: number;
-}): ProfileForm => ({
-  profileId: s.id,
-  clientRef: s.clientRef,
-  label: s.label ?? '',
-  riskAppetite: s.riskAppetite,
-  horizonMonths: s.horizonMonths,
-  lossTolerancePct: s.lossTolerancePct,
-  concentrationPct: s.concentrationPct,
-});

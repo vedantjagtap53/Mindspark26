@@ -27,7 +27,7 @@ describe('forecastRequestSchema', () => {
       underlying: { symbol: '^NSEI', assetClass: 'index' },
       tenorDays: 90,
     });
-    expect(r.trainingWindowYears).toBe(10);
+    expect(r.trainingWindowYears).toBe(3);
     expect(r.samplePathCount).toBe(500);
   });
 
@@ -39,13 +39,19 @@ describe('forecastRequestSchema', () => {
     expect(r.success).toBe(false);
   });
 
-  it('rejects a 7-year training window', () => {
-    const r = forecastRequestSchema.safeParse({
+  const withWindow = (trainingWindowYears: unknown) =>
+    forecastRequestSchema.safeParse({
       underlying: { symbol: '^NSEI', assetClass: 'index' },
       tenorDays: 90,
-      trainingWindowYears: 7,
+      trainingWindowYears,
     });
-    expect(r.success).toBe(false);
+
+  it.each([30 / 365, 0.5, 1, 2.4, 3])('accepts a %s-year training window', (years) => {
+    expect(withWindow(years).success).toBe(true);
+  });
+
+  it.each([29 / 365, 0, -1, 3.01, 5, 10, '3', null])('rejects a training window of %s', (years) => {
+    expect(withWindow(years).success).toBe(false);
   });
 });
 

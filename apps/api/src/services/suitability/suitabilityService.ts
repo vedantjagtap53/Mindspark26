@@ -64,7 +64,7 @@ export function createSuitabilityService(deps: {
   concentrationLimitPct: number;
 }): SuitabilityService {
   return {
-    async assess({ simulationId, profile, profileId }) {
+    async assess({ simulationId, profile }) {
       const record = deps.records.get(simulationId);
       const { low, base } = lowAndBaseCases(record);
       const { verdict, flags } = assessSuitability({
@@ -87,7 +87,6 @@ export function createSuitabilityService(deps: {
       const ids = await deps.persistence.recordAssessment({
         record,
         profile,
-        profileId,
         suitability: response,
       });
       // A new profile invalidates any explanation written for the previous verdict.

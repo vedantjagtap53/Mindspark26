@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { ClientProfile } from '@mindspark/shared';
+import type { SuitabilityProfile } from '@mindspark/shared';
 import {
   assessSuitability,
   type SuitabilityInput,
 } from '../../../src/engines/suitability/suitability.js';
 
-const calm: ClientProfile = {
+const calm: SuitabilityProfile = {
   riskAppetite: 'high',
   horizonMonths: 24,
   lossTolerancePct: 20,

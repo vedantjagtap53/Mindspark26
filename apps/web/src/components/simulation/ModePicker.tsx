@@ -3,6 +3,7 @@ import { Play, Sparkles } from 'lucide-react';
 import { SHOCK_PRESETS } from '../../constants/products';
 import {
   runBlocker,
+  TRAINING_WINDOW_RANGE,
   type LevelSourceChoice,
   type Mode,
   type ProductType,
@@ -19,6 +20,8 @@ interface Props {
   run: RunSettings;
   onRun: (r: RunSettings) => void;
   termIssueCount: number;
+  /** Why the client profile is incomplete (name, age), or null. */
+  profileIssue: string | null;
   loading: boolean;
   elapsedSeconds: number;
   onExecute: () => void;
@@ -29,6 +32,7 @@ export function ModePicker({
   run,
   onRun,
   termIssueCount,
+  profileIssue,
   loading,
   elapsedSeconds,
   onExecute,
@@ -40,7 +44,7 @@ export function ModePicker({
   const blocker =
     termIssueCount > 0
       ? 'Fix the highlighted product terms first (stage 2).'
-      : runBlocker(product, run);
+      : (profileIssue ?? runBlocker(product, run));
   const levelOptions: Array<{ value: LevelSourceChoice; label: string }> = isDcd
     ? [
         { value: 'reference', label: 'FX reference rate' },
@@ -82,19 +86,33 @@ export function ModePicker({
 
       {run.mode === 'A' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-3.5 rounded-xl clay-tile-light border border-[var(--border-subtle)]">
-            <span className="text-[11px] font-mono text-[var(--ink-muted)] font-semibold block mb-1 uppercase">
-              Training window
-            </span>
-            <Segmented<5 | 10>
-              label="Training window"
-              value={run.trainingWindowYears}
-              onChange={(v) => set('trainingWindowYears', v)}
-              options={[
-                { value: 5, label: '5 years' },
-                { value: 10, label: '10 years (incl. 2020)' },
-              ]}
+          <div className="p-3.5 rounded-xl clay-tile-light border border-[var(--border-subtle)] space-y-2">
+            <div className="flex justify-between text-xs mb-1">
+              <label
+                htmlFor="training-window"
+                className="font-mono text-[var(--ink-muted)] font-semibold uppercase"
+              >
+                Training window
+              </label>
+              <span className="font-bold text-[var(--ink-primary)]">
+                {run.trainingWindowDays} days ({(run.trainingWindowDays / 365).toFixed(1)} years)
+              </span>
+            </div>
+            <input
+              id="training-window"
+              type="range"
+              min={TRAINING_WINDOW_RANGE.min}
+              max={TRAINING_WINDOW_RANGE.max}
+              step={1}
+              value={run.trainingWindowDays}
+              onChange={(e) => set('trainingWindowDays', Number(e.target.value))}
+              className="w-full accent-[var(--accent-primary)] cursor-pointer"
             />
+            <div className="flex justify-between text-[10px] text-[var(--ink-muted)] font-mono">
+              <span>30 days</span>
+              <span>1.5 years</span>
+              <span>3 years</span>
+            </div>
           </div>
           <div className="p-3.5 rounded-xl clay-tile-light border border-[var(--border-subtle)] text-[11px] text-[var(--ink-muted)] leading-relaxed">
             The forecast service returns low (P5), base (P50) and high (P95) paths plus 500 sample

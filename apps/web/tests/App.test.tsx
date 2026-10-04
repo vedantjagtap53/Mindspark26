@@ -78,26 +78,11 @@ const explanation: ExplainResponse = {
   model: 'gemini-2.5-flash',
 };
 
-const savedProfiles = [
-  {
-    id: '6f1c1f5e-3b0a-4a76-9b2c-1d2e3f4a5b6c',
-    clientRef: 'CL-0042',
-    label: 'Retirement',
-    riskAppetite: 'low',
-    horizonMonths: 36,
-    lossTolerancePct: 5,
-    concentrationPct: 20,
-    createdAt: '2026-10-01T00:00:00.000Z',
-    updatedAt: '2026-10-01T00:00:00.000Z',
-  },
-];
-
 /** Routes the stubbed API by path, recording each request body. */
 function backend() {
   const bodies: Record<string, unknown[]> = {};
   const fetchMock = vi.fn((url: string, init: RequestInit) => {
     if (init?.body) (bodies[url] ??= []).push(JSON.parse(init.body as string));
-    if (url === '/api/client-profiles') return json(200, { profiles: savedProfiles });
     if (url === '/api/simulate') return json(200, modeB);
     if (url === '/api/suitability') return json(200, suitability);
     if (url === '/api/explain') return json(200, explanation);
@@ -152,9 +137,13 @@ afterEach(() => {
 });
 
 /** The app opens on the landing page; every journey starts from its button. */
-function renderApp() {
+function renderApp(clientName: string | null = 'Asha Rao') {
   render(<App />);
   fireEvent.click(screen.getAllByRole('button', { name: /Start New Mandate/ })[0]!);
+  // A run needs the client's name; pass null to leave it empty.
+  if (clientName !== null) {
+    fireEvent.change(screen.getByLabelText('Client name'), { target: { value: clientName } });
+  }
 }
 
 const goToSimulate = () => fireEvent.click(screen.getByRole('button', { name: /3\. Simulate/ }));
@@ -206,12 +195,14 @@ describe('Payoff Desk journey', () => {
     renderApp();
     await runModeB();
 
-    // The verdict is requested for the run with the profile's four rule fields only.
+    // The verdict is requested with the client snapshot and rule fields.
     await waitFor(() =>
       expect(bodies['/api/suitability']).toEqual([
         {
           simulationId: 'sim-1',
           profile: {
+            name: 'Asha Rao',
+            age: 30,
             riskAppetite: 'medium',
             horizonMonths: 12,
             lossTolerancePct: 10,
@@ -250,62 +241,52 @@ describe('Payoff Desk journey', () => {
     });
   });
 
-  it('loads a saved profile and links the verdict to it', async () => {
+  it('sends the name and age the RM typed with the verdict request', async () => {
     const { bodies } = backend();
-    renderApp();
-    const select = await screen.findByLabelText('Saved profile');
-    await screen.findByRole('option', { name: /CL-0042/ });
-    fireEvent.change(select, { target: { value: savedProfiles[0]!.id } });
-    fireEvent.click(screen.getByRole('button', { name: /Load saved profile/ }));
-    expect(screen.getByLabelText<HTMLInputElement>('Client reference').value).toBe('CL-0042');
-    expect(screen.getByRole('button', { name: /Update saved profile/ })).toBeTruthy();
-
+    renderApp('  Ravi Menon ');
+    fireEvent.change(screen.getByLabelText('Client age'), { target: { value: '61' } });
     await runModeB();
     await waitFor(() =>
-      expect(bodies['/api/suitability']).toEqual([
-        {
-          simulationId: 'sim-1',
-          profileId: savedProfiles[0]!.id,
-          profile: {
-            riskAppetite: 'low',
-            horizonMonths: 36,
-            lossTolerancePct: 5,
-            concentrationPct: 20,
-          },
-        },
+      expect(bodies['/api/suitability']).toMatchObject([
+        { profile: { name: 'Ravi Menon', age: 61 } },
       ]),
     );
   });
 
-  it('saves a new profile through /api/client-profiles', async () => {
-    const created = {
-      ...savedProfiles[0]!,
-      id: '11111111-2222-4333-8444-555555555555',
-      clientRef: 'CL-7',
-    };
-    const posted: unknown[] = [];
-    vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
-      if (init?.method === 'POST') {
-        posted.push(JSON.parse(init.body as string));
-        return json(201, created);
-      }
-      return json(200, { profiles: [] });
-    });
-    renderApp();
-    fireEvent.change(screen.getByLabelText('Client reference'), { target: { value: 'CL-7' } });
-    fireEvent.click(screen.getByRole('button', { name: /^Save profile/ }));
-    expect(await screen.findByText('Saved CL-7.')).toBeTruthy();
-    expect(posted[0]).toMatchObject({ clientRef: 'CL-7', label: null, riskAppetite: 'medium' });
+  it('holds the run until the client name and age are entered', () => {
+    backend();
+    renderApp(null);
+    goToSimulate();
+    fireEvent.change(screen.getByLabelText(/Starting level \(S/), { target: { value: '25000' } });
+    const run = screen.getByRole<HTMLButtonElement>('button', { name: /Run simulation/ });
+    expect(run.disabled).toBe(true);
+    expect(screen.getByText('Enter the client name.')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /1\. Mandate/ }));
+    fireEvent.change(screen.getByLabelText('Client name'), { target: { value: 'Asha Rao' } });
+    fireEvent.change(screen.getByLabelText('Client age'), { target: { value: '' } });
+    goToSimulate();
+    expect(screen.getByText('Enter the client age.')).toBeTruthy();
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: /Run simulation/ }).disabled).toBe(
+      true,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /1\. Mandate/ }));
+    fireEvent.change(screen.getByLabelText('Client age'), { target: { value: '45' } });
+    goToSimulate();
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: /Run simulation/ }).disabled).toBe(
+      false,
+    );
   });
 
-  it('shows the backend error when saved profiles are unavailable', async () => {
-    vi.stubGlobal('fetch', () =>
-      json(503, {
-        error: { code: 'DATABASE_NOT_CONFIGURED', message: 'Saved profiles need the database' },
-      }),
-    );
+  it('has no saved-profile controls and never calls /api/client-profiles', async () => {
+    const { fetchMock } = backend();
     renderApp();
-    expect(await screen.findByText(/DATABASE_NOT_CONFIGURED/)).toBeTruthy();
+    expect(screen.queryByLabelText('Saved profile')).toBeNull();
+    expect(screen.queryByText(/saved profile/i)).toBeNull();
+    expect(screen.queryByLabelText('Client reference')).toBeNull();
+    await runModeB();
+    expect(fetchMock.mock.calls.map(([u]) => u)).not.toContain('/api/client-profiles');
   });
 
   it('shows a forecast failure as-is and offers Mode B instead of a substitute', async () => {
@@ -323,6 +304,34 @@ describe('Payoff Desk journey', () => {
     fireEvent.click(screen.getByRole('button', { name: /Switch to Mode B/ }));
     expect(screen.getByRole('radio', { name: /Mode B/ }).getAttribute('aria-checked')).toBe('true');
     expect(screen.queryByText('AI_UNAVAILABLE')).toBeNull();
+  });
+
+  it('lets the RM pick a training window from 30 days to 3 years for Mode A', async () => {
+    const simulateBodies: unknown[] = [];
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+      if (url === '/api/simulate') simulateBodies.push(JSON.parse(init?.body as string));
+      return json(503, {
+        error: { code: 'AI_UNAVAILABLE', message: 'Forecast service unavailable' },
+      });
+    });
+    renderApp();
+    goToSimulate();
+    fireEvent.click(screen.getByRole('radio', { name: /Mode A/ }));
+
+    const slider = screen.getByLabelText<HTMLInputElement>('Training window');
+    expect(slider.type).toBe('range');
+    expect([slider.min, slider.max]).toEqual(['30', '1095']);
+    expect(screen.getByText('1095 days (3.0 years)')).toBeTruthy();
+
+    fireEvent.change(slider, { target: { value: '365' } });
+    expect(screen.getByText('365 days (1.0 years)')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Run simulation/ }));
+    await waitFor(() =>
+      expect(simulateBodies).toMatchObject([{ mode: 'A', trainingWindowYears: 1 }]),
+    );
+    // The old two-option choice is gone.
+    expect(screen.queryByText('10 years (incl. 2020)')).toBeNull();
+    expect(screen.queryByRole('radio', { name: '5 years' })).toBeNull();
   });
 
   it('streams the live price for the underlying over /api/live', async () => {

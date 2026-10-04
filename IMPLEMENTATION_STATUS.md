@@ -24,7 +24,7 @@
 
 ## Product and backend work
 
-- [x] Frontend (`apps/web`) — five-stage journey wired to the real API: product forms with shared-schema checks and `/api/configure`, Mode A/B for all three products, payoff chart with breakevens, scenario table (both modes), fan chart with price history, risk panel, model card, live ticker, suitability verdict with flags and audit status, AI explanation and chat, session runs and print memo, save / load / update client profiles (2026-10-04).
+- [x] Frontend (`apps/web`) — five-stage journey wired to the real API: product forms with shared-schema checks and `/api/configure`, Mode A/B for all three products, payoff chart with breakevens, scenario table (both modes), fan chart with price history, risk panel, model card, live ticker, suitability verdict with flags and audit status, AI explanation and chat, session runs and print memo, per-simulation client profile entry (2026-10-04).
 - [x] Local setup (2026-10-04): `npm run setup` (.env files with a generated shared AI key, npm install, a `.venv` per Python service), `npm run dev:forecast` / `dev:rag` start scripts, README "Getting started". `jsdom` moved to the root devDependencies so `npm test` runs the web tests. The `apps/Frontend` prototype is archived as `docs/design/payoff-desk-prototype.zip` (it was in the `apps/*` workspace and failed root lint). Mode A verified end to end against the local forecast service.
 - [x] `npm run lint` clean (2026-10-04): `**/.venv/`, Playwright output and the root `Frontend/` prototype are ignored. `Frontend/` and `ML/` at the root look like pre-workspace copies of `apps/web` and `services/forecast`; delete them if no longer needed (your call).
 - [x] `npm audit`: 0 vulnerabilities (2026-10-04, after the database SDK change).
@@ -32,7 +32,7 @@
 - [~] Supabase schema — `supabase/migrations/20261004120000_initial_schema.sql` (6 tables, 6 enums, `record_simulation` RPC for the atomic simulation write, append-only triggers on the 5 audit tables, RLS on with no policies), `supabase/config.toml` for the local stack (2026-10-04). Applied to the hosted project `nayidduvrljhblgoyakh` (2026-10-04): all 6 tables and `record_simulation` present, publishable key denied (42501), API reads `/api/client-profiles` from it.
 - [x] Repository interfaces (`apps/api/src/repositories/interfaces/`) and contract test suite; a test-only in-memory implementation passes it (2026-10-04)
 - [~] Supabase repository adapter (`apps/api/src/repositories/supabase/`, `@supabase/supabase-js` with the service-role key), wired into the services; unit tests through supabase-js with a fake PostgREST pass (2026-10-04). The real-database suite (`apps/api/tests/supabase`: contract, append-only check, app flow) has not run yet: Docker cannot start on the dev machine (no WSL).
-- [x] Product configuration and validation — ELN/DCD/CPN term schemas (`packages/shared/src/schemas/product.ts`); saved-profile schema (`savedProfileInputSchema`). Upper limits beyond the PRD's are an open decision.
+- [x] Product configuration and validation — ELN/DCD/CPN term schemas (`packages/shared/src/schemas/product.ts`); client profile schema (name 1–120 chars, age 18–120, plus the four rule fields). Upper limits beyond the PRD's are an open decision.
 - [x] ELN / DCD / CPN payoff engines — `apps/api/src/engines/payoff/`, 63 unit tests including the product-notes worked examples (2026-10-03)
 - [x] Live prices via Finnhub WebSocket (MVP, 2026-10-04): live level for Mode B and a `/api/live` relay feeding a live ticker in the Simulate stage; Upstox kept as future scope. Free tier covers US stocks and crypto, not Nifty 50. Not yet tried with a real key.
 - [~] Market-data integration — Upstox WebSocket live level (Nifty 50), Frankfurter FX reference rate, and daily history for the fan chart from Yahoo Finance (`MARKET_HISTORY_PROVIDER=yahoo`, 2026-10-04). Live FX and other underlyings not built. No provider has been called from this sandbox (outbound market-data hosts are blocked).
@@ -41,7 +41,7 @@
 - [x] Forecast service — `services/forecast/` brought to contract v1.0, with a variance fix, Bearer auth and strict request validation (2026-10-04)
 - [x] Risk engine — return %, loss amount, exact breakevens (scan + 40-round bisection, `engines/risk/breakeven.ts`), payoff curve and scenario table in both modes
 - [x] Suitability engine — rules decided 2026-10-04, `apps/api/src/engines/suitability/` with unit tests
-- [x] Persistence (2026-10-04) — `/api/suitability` writes configuration, simulation, risk results, profile snapshot and verdict; `/api/explain` writes the explanation; `/api/client-profiles` reads and writes profiles. Moved to Supabase 2026-10-04; see the adapter line for verification status. Without database settings nothing is persisted and the verdict says so (`persisted: false`). Runs stay in API memory as working state.
+- [x] Persistence (2026-10-04) — `/api/suitability` writes configuration, simulation, risk results, profile snapshot and verdict; `/api/explain` writes the explanation. Moved to Supabase 2026-10-04; see the adapter line for verification status. Without database settings nothing is persisted and the verdict says so (`persisted: false`). Runs stay in API memory as working state.
 - [x] Tests — unit and integration (API, web), Python (forecast), local Supabase suites, and Playwright browser tests in `tests/e2e` (`npm run test:e2e`, 2026-10-04)
 
 ## API boundary
@@ -54,6 +54,10 @@
 - [x] `POST /api/chat` — via services/rag; same testing status (2026-10-04)
 
 ## Current task
+
+2026-10-04 (training window): Mode A training window changed from "5 or 10 years" to a slider, **30 days to 3 years** (default 3 years), at Karan's request. Both owners approved the fractional-years forecast contract on 2026-10-04. Changed: the Simulate screen (days slider), shared schemas and constants, `docs/forecasting.md`, `docs/market-data.md`, API tests, PRD and a new migration (`20261004140000_training_window_fractional_years.sql`: `simulations.training_window_years` integer → double precision, to be applied with `npx supabase db push`). **Not changed: `services/forecast` (the AI/ML developer's service).** It still accepts only 5 or 10, so the forecast-service implementation must be updated before other window values work end to end. A window of a few weeks gives very few returns for a stable GARCH fit.
+
+2026-10-04 (client profile): saved profiles removed, client name and age added; Karan confirmed whole-number age validation from 18–120. PRD and API specification updated to match (see Architecture change requests). Verified: typecheck, lint, API and web unit tests. Not verified: the new migration (no database to run it on here), the real-database suite, and the browser tests (`tests/e2e`, Chromium not installed).
 
 2026-10-04 (database migration): Firebase SQL Connect replaced by Supabase, approved by Karan. SQL migration, Supabase adapter, config (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`), tests and docs updated; `dataconnect/`, `firebase.json`, the Firebase adapter and `firebase-admin` removed. Node 22+ is now required (supabase-js). Next: run `apps/api/tests/supabase` against a real database, then create the hosted project.
 
@@ -68,7 +72,7 @@ Backend foundation done (2026-10-03). `/api/configure`, product schemas and payo
 
 - [x] Coupon `T = tenorDays / 365`; strike and barrier are % of `S_0`; touching the barrier is knock-in; the DCD base is the deposit currency; Mode B American knock-in uses the shocked value.
 - [x] Verdict: hard flag → Not suitable, other flag → Caution, none → Suitable. Ratings: CPN Low, DCD High, ELN High.
-- [x] Saved client profiles via `/api/client-profiles`.
+- [x] ~~Saved client profiles via `/api/client-profiles`~~ — removed 2026-10-04 (see Architecture change requests).
 
 ## Blocked / requires decision
 
@@ -78,16 +82,17 @@ Backend foundation done (2026-10-03). `/api/configure`, product schemas and payo
 
 - [x] Suitability decisions made 2026-10-04 (hard flags, scale, 25% concentration limit, units, Mode B low case) — see `docs/suitability-rules.md`.
 - [?] CPN cap semantics confirmation — see `docs/product-formulas.md`.
-- [x] `/client-profiles` built on the decided fields, no delete (2026-10-04). `/suitability` accepts an optional `profileId` to link the record (additive).
+- [x] ~~`/client-profiles` and the optional `profileId`~~ — removed 2026-10-04.
 - [?] Product notes vs formula: the plain-ELN −10% row in the notes (₹11,00,000) contradicts the formula; the engine follows the formula — see `docs/product-formulas.md`.
 - [?] Validation limits other than tenor (tenor is now 30–1,095 days, PRD §3) and endpoint payload schemas. The forecast contract is `docs/forecasting.md`; explain/chat follow the AI service's own `SimulationContext` (services/rag/rag/schemas.py), summarised in `API_SPEC.md`.
 - [?] Market data provider: Yahoo Finance chosen for daily history and the forecast refresh (free, unofficial); approve its terms for this use, or name a licensed provider — see `docs/market-data.md`.
 
 ## Architecture change requests
 
+- 2026-10-04 — Requested by Karan: **saved client profiles removed completely; name and age added to the client.** Removed: the save/load UI, `/api/client-profiles`, the `profileId` field on `/suitability`, the profile repository, and (migration `20261004130000_remove_client_profiles.sql`) the `client_profiles` table and `simulations.profile_id`. Added: `name` (1–120 chars) and `age` (whole number 18–120) on the `/suitability` profile and in each simulation's stored snapshot; shown in the profile form, session list and print memo. Karan confirmed the age limits on 2026-10-04. Both values are stored in the database (reversing the earlier "no client names" decision), and age is display-only (no suitability rule reads it; neither field is sent to the AI service). The PRD and API specification now reflect this product decision. The migration is not yet applied to the hosted Supabase project (`npx supabase db push`).
 - 2026-10-04 — Approved by Karan: Firebase SQL Connect replaced by Supabase as the only database, with no fallback or failover. All Firebase code, config and env variables removed (`FIREBASE_*`, `DATA_CONNECT_EMULATOR_HOST`); new env `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. Access via `@supabase/supabase-js` with the service-role key; the simulation write is a Postgres function (RPC) so it stays atomic. `/api/health` now reports `database: { provider: "supabase", configured }`. Supersedes the two entries below.
 - 2026-10-04 — Approved by Karan: Supabase removed entirely; Firebase SQL Connect is the only database, with no fallback or failover. `DATABASE_PRIMARY` and `SUPABASE_*` env variables removed; `/api/health` now reports `database: { provider: "firebase-sql-connect", configured }`, where configured means project, SQL Connect service and location are set.
-- 2026-10-03 — Approved by Karan: PRD v2.0 Mode A method (GARCH(1,1) Monte Carlo, 10-year window incl. COVID, P5/P50/P95 case paths, sample paths for distribution metrics), tenor range 30–1,095 days, forecast contract v1.0, new error codes `AI_UNAVAILABLE` / `AI_INVALID_RESPONSE`. Forecast service stays external, owned by the AI/ML developer.
+- 2026-10-03 — Originally approved by Karan: PRD v2.0 Mode A method (GARCH(1,1) Monte Carlo, 10-year window incl. COVID, P5/P50/P95 case paths, sample paths for distribution metrics), tenor range 30–1,095 days, forecast contract v1.0, new error codes `AI_UNAVAILABLE` / `AI_INVALID_RESPONSE`. The training-window requirement was superseded on 2026-10-04 by the owner-approved 30-day-to-3-year contract documented in `PRD.md` and `docs/forecasting.md`. Forecast service remains external, owned by the AI/ML developer.
 
 ## Approved database architecture — 2026-10-04
 

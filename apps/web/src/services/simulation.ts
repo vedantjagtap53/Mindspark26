@@ -33,7 +33,6 @@ export const assessSuitability = (
     {
       simulationId,
       profile: clientProfile(profile),
-      ...(profile.profileId ? { profileId: profile.profileId } : {}),
     },
     fetchImpl,
   );

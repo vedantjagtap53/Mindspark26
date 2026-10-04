@@ -77,7 +77,7 @@ describe('simulateRequest', () => {
     const body = simulateRequest('CPN', DEFAULT_FORMS, {
       ...DEFAULT_RUN,
       mode: 'A',
-      trainingWindowYears: 5,
+      trainingWindowDays: 730,
     });
     expect(Object.keys(body).sort()).toEqual([
       'mode',
@@ -85,6 +85,23 @@ describe('simulateRequest', () => {
       'terms',
       'trainingWindowYears',
     ]);
-    expect(body).toMatchObject({ mode: 'A', productType: 'CPN', trainingWindowYears: 5 });
+    expect(body).toMatchObject({ mode: 'A', productType: 'CPN', trainingWindowYears: 2 });
+  });
+
+  it('sends the training window in years across the whole 30-day to 3-year range', () => {
+    const years = (trainingWindowDays: number) =>
+      (
+        simulateRequest('ELN', DEFAULT_FORMS, {
+          ...DEFAULT_RUN,
+          mode: 'A',
+          trainingWindowDays,
+        }) as {
+          trainingWindowYears: number;
+        }
+      ).trainingWindowYears;
+    expect(years(30)).toBe(30 / 365);
+    expect(years(365)).toBe(1);
+    expect(years(1095)).toBe(3);
+    expect(DEFAULT_RUN.trainingWindowDays).toBe(1095);
   });
 });

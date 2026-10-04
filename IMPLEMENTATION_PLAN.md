@@ -50,7 +50,7 @@ React + TypeScript + Vite. Uses the shared Zod schemas from `@mindspark/shared` 
 | --- | ------------------ | ------------------------------------------------------------------------------------------------ |
 | 1   | **Dashboard**      | Three cards: ELN, DCD, CPN                                                                       |
 | 2   | **Product form**   | One form per product (fields in PRD §3). Tenor 30–1,095 days, barrier below strike, notional > 0 |
-| 3   | **Client profile** | Risk appetite, horizon, loss tolerance, concentration. "Load saved profile"                      |
+| 3   | **Client profile** | Name, age, risk appetite, horizon, loss tolerance, concentration (no saved profiles, 2026-10-04) |
 | 4   | **Mode picker**    | Mode A (forecast) or Mode B (shock: −10%, 0%, +x%, custom)                                       |
 | 5   | **Results**        | Everything below, plus the "simulation, not a guarantee" notice                                  |
 
@@ -92,11 +92,7 @@ Node.js + TypeScript + Express 5 + Zod.
 | POST   | `/api/explain`     | Simulation id                      | Plain-language explanation (from the ML service)                                                                             |
 | POST   | `/api/chat`        | Simulation id + question           | Answer (from the ML service)                                                                                                 |
 
-Needs your approval before adding (not in `API_SPEC.md` yet):
-
-| Method     | Path                   | Why                                      |
-| ---------- | ---------------------- | ---------------------------------------- |
-| GET / POST | `/api/client-profiles` | PRD §7.1 asks for "load a saved profile" |
+`/api/client-profiles` was added and then removed on 2026-10-04: the RM now enters the client for each run, so there is no saved profile to load.
 
 ### Error codes
 
@@ -135,14 +131,13 @@ Controller → Service → Repository interface → Supabase adapter
 
 ### Tables
 
-| Table                    | Key columns                                                                                                       | Written by          |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------- | ------------------- |
-| `client_profiles`        | id, name, risk_appetite, horizon_months, loss_tolerance_pct, concentration_pct, created_at                        | Client profile form |
-| `product_configurations` | id, product_type, terms (json), created_at                                                                        | `/configure`        |
-| `simulations`            | id, profile_id, config_id, mode, shock_pct, forecast_meta (json), created_at                                      | `/simulate`         |
-| `risk_results`           | id, simulation_id, case (low/base/high/shock), terminal, payoff, return_pct, knocked_in, prob_loss, prob_knock_in | `/simulate`         |
-| `suitability_results`    | id, simulation_id, verdict, flags (json), created_at                                                              | `/suitability`      |
-| `explanations`           | id, simulation_id, text, model, created_at                                                                        | `/explain`          |
+| Table                    | Key columns                                                                                                       | Written by     |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------- | -------------- |
+| `product_configurations` | id, product_type, terms (json), created_at                                                                        | `/configure`   |
+| `simulations`            | id, config_id, mode, profile_snapshot (json: name, age, rule fields), shock_pct, forecast_meta (json), created_at | `/suitability` |
+| `risk_results`           | id, simulation_id, case (low/base/high/shock), terminal, payoff, return_pct, knocked_in, prob_loss, prob_knock_in | `/simulate`    |
+| `suitability_results`    | id, simulation_id, verdict, flags (json), created_at                                                              | `/suitability` |
+| `explanations`           | id, simulation_id, text, model, created_at                                                                        | `/explain`     |
 
 `forecast_meta` holds the model, training window, as-of date, case end values and backtest. Sample paths and the fan chart are **not** stored.
 

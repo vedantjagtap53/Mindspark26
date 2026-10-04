@@ -3,14 +3,14 @@
 // when Supabase is configured and a write fails, the request fails with a clear error;
 // when it is not configured (development, tests) nothing is persisted and the caller is told so.
 //
-// A simulation row is immutable and links the profile used, so the whole record (configuration,
-// simulation with its risk results, verdict) is written when the verdict is computed, i.e. when
-// the profile is known. A re-assessment with another profile writes another simulation row.
+// A simulation row is immutable and carries a frozen copy of the client as entered (name, age and
+// the rule fields), so the whole record (configuration, simulation with its risk results, verdict)
+// is written when the verdict is computed, i.e. when the profile is known. A re-assessment with
+// another profile writes another simulation row.
 
 import type { ClientProfile, SuitabilityResponse } from '@mindspark/shared';
 import {
   RepositoryError,
-  type ClientProfileInput,
   type ProductConfigurationInput,
   type Repositories,
   type RiskResultInput,
@@ -34,7 +34,6 @@ export interface PersistenceService {
   recordAssessment(input: {
     record: SimulationRecord;
     profile: ClientProfile;
-    profileId?: string;
     suitability: SuitabilityResponse;
   }): Promise<PersistedIds | null>;
   recordExplanation(
@@ -124,10 +123,9 @@ function riskResults(record: SimulationRecord): RiskResultInput[] {
 function simulationInput(
   record: SimulationRecord,
   configurationId: string,
-  profile: ClientProfileInput,
-  profileId: string | null,
+  profile: ClientProfile,
 ): SimulationInput {
-  const base = { configurationId, profileId, profileSnapshot: profile };
+  const base = { configurationId, profileSnapshot: profile };
   const results = riskResults(record);
   const r = record.response;
   if (r.mode === 'A') {
@@ -160,23 +158,14 @@ export function createPersistenceService(repositories?: Repositories): Persisten
   return {
     enabled: repositories !== undefined,
 
-    async recordAssessment({ record, profile, profileId, suitability }) {
+    async recordAssessment({ record, profile, suitability }) {
       if (!repositories) return null;
       try {
         const configurationId =
           record.configurationId ??
           (await repositories.productConfigurations.create(configurationInput(record)));
-        // The snapshot carries the saved profile's reference when there is one; an ad hoc profile
-        // has none, so a placeholder keeps the snapshot shape (clientRef is never sent to the AI).
-        const saved = profileId ? await repositories.clientProfiles.getById(profileId) : null;
-        if (profileId && !saved) throw new AppError('NOT_FOUND', 'Saved client profile not found');
-        const snapshot: ClientProfileInput = {
-          clientRef: saved?.clientRef ?? 'unsaved',
-          label: saved?.label ?? null,
-          ...profile,
-        };
         const simulationId = await repositories.simulations.record(
-          simulationInput(record, configurationId, snapshot, saved ? saved.id : null),
+          simulationInput(record, configurationId, profile),
         );
         await repositories.suitabilityResults.create({
           simulationId,

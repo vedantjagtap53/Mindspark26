@@ -12,6 +12,7 @@ import { createSupabaseRepositories } from '../../../src/repositories/supabase/s
 import {
   RepositoryError,
   type ModeBSimulationInput,
+  type SuitabilityResultInput,
 } from '../../../src/repositories/interfaces/index.js';
 
 const UUID = '0b130d38-810d-4c92-8c9a-3cca20440c2b';
@@ -67,7 +68,6 @@ describe('mapping', () => {
     expect(fromDb.verdict('NOT_SUITABLE')).toBe('Not suitable');
     expect(toDb.levelSource('reference')).toBe('REFERENCE');
     expect(fromDb.scenario('SHOCK')).toBe('shock');
-    expect(fromDb.riskAppetite('MEDIUM')).toBe('medium');
     expect(() => fromDb.verdict('MAYBE')).toThrow(/Unexpected verdict/);
   });
 });
@@ -88,10 +88,26 @@ describe('error mapping', () => {
     expect(toRepositoryError(err, status).kind).toBe(kind);
   });
 
-  it('says when Supabase cannot be reached', () => {
+  it('says when Supabase cannot be reached, and why', () => {
     expect(toRepositoryError({ code: '', message: 'fetch failed' }, 0).message).toBe(
-      'Supabase is unreachable',
+      'Supabase is unreachable (fetch failed)',
     );
+    const withCause = toRepositoryError(
+      { code: '', message: 'TypeError: fetch failed', details: 'cause: getaddrinfo ENOTFOUND' },
+      0,
+    );
+    expect(withCause.message).toBe(
+      'Supabase is unreachable (TypeError: fetch failed: cause: getaddrinfo ENOTFOUND)',
+    );
+  });
+
+  it('tells a timeout apart from a connection failure', () => {
+    const err = toRepositoryError(
+      { code: '', message: 'AbortError: The operation was aborted due to timeout' },
+      0,
+    );
+    expect(err.kind).toBe('unavailable');
+    expect(err.message).toMatch(/did not answer within 10 s/);
   });
 
   it('points at the URL when the server answers without a database error', () => {
@@ -131,20 +147,61 @@ describe('error mapping', () => {
       status: 409,
       body: { code: '23505', message: 'duplicate key', details: null, hint: null },
     }));
-    const err = await repos.clientProfiles
-      .create({
-        clientRef: 'CRM-1',
-        label: null,
-        riskAppetite: 'low',
-        horizonMonths: 12,
-        lossTolerancePct: 5,
-        concentrationPct: 10,
-      })
+    const err = await repos.suitabilityResults
+      .create({ simulationId: UUID, verdict: 'Caution', flags: [], rulesVersion: 'v1' })
       .catch((e: unknown) => e);
     expect((err as RepositoryError).kind).toBe('conflict');
   });
 
-  // A write, because supabase-js retries reads after network errors (about 7 s of backoff).
+  const connectError = (code: string) =>
+    Object.assign(new TypeError('fetch failed'), { cause: { code } });
+  const verdict: SuitabilityResultInput = {
+    simulationId: UUID,
+    verdict: 'Caution',
+    flags: [],
+    rulesVersion: 'v1',
+  };
+
+  it('retries a connection failure, before anything was sent, and then succeeds', async () => {
+    let attempts = 0;
+    const flaky: typeof fetch = () => {
+      attempts++;
+      if (attempts < 3) return Promise.reject(connectError('UND_ERR_CONNECT_TIMEOUT'));
+      return Promise.resolve(
+        new Response(JSON.stringify({ id: UUID }), {
+          status: 201,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+    };
+    const repos = createSupabaseRepositories(createSupabaseClient(DB, flaky));
+    expect(await repos.suitabilityResults.create(verdict)).toBe(UUID);
+    expect(attempts).toBe(3);
+  });
+
+  it('gives up after two retries and reports the failure', async () => {
+    let attempts = 0;
+    const down: typeof fetch = () => {
+      attempts++;
+      return Promise.reject(connectError('ECONNREFUSED'));
+    };
+    const repos = createSupabaseRepositories(createSupabaseClient(DB, down));
+    const err = await repos.suitabilityResults.create(verdict).catch((e: unknown) => e);
+    expect((err as RepositoryError).kind).toBe('unavailable');
+    expect(attempts).toBe(3);
+  });
+
+  it('never retries a failure that may have reached the server', async () => {
+    let attempts = 0;
+    const reset: typeof fetch = () => {
+      attempts++;
+      return Promise.reject(connectError('ECONNRESET'));
+    };
+    const repos = createSupabaseRepositories(createSupabaseClient(DB, reset));
+    await repos.suitabilityResults.create(verdict).catch(() => undefined);
+    expect(attempts).toBe(1);
+  });
+
   it('maps a network failure to unavailable', async () => {
     const failing: typeof fetch = () => Promise.reject(new TypeError('fetch failed'));
     const repos = createSupabaseRepositories(createSupabaseClient(DB, failing));
@@ -159,42 +216,24 @@ describe('error mapping', () => {
 describe('Supabase repositories (fake PostgREST)', () => {
   it('sends the service-role key and database enums, and returns the new id', async () => {
     const { repos, calls } = fakeDb(() => ({ status: 201, body: { id: UUID } }));
-    const id = await repos.clientProfiles.create({
-      clientRef: 'CRM-1',
-      label: null,
-      riskAppetite: 'high',
-      horizonMonths: 12,
-      lossTolerancePct: 5,
-      concentrationPct: 10,
+    const id = await repos.suitabilityResults.create({
+      simulationId: UUID,
+      verdict: 'Not suitable',
+      flags: [{ rule: 'low_case_loss', hard: true, reason: 'Loss above tolerance' }],
+      rulesVersion: 'v1',
     });
     expect(id).toBe(UUID);
     expect(calls[0]).toMatchObject({
       method: 'POST',
-      path: '/rest/v1/client_profiles',
-      body: { client_ref: 'CRM-1', risk_appetite: 'HIGH', loss_tolerance_pct: 5 },
+      path: '/rest/v1/suitability_results',
+      body: { simulation_id: UUID, verdict: 'NOT_SUITABLE', rules_version: 'v1' },
     });
     expect(calls[0]!.headers.get('apikey')).toBe('service-key');
-  });
-
-  it('reports an update of an unknown id as false', async () => {
-    const { repos, calls } = fakeDb(() => ({ body: [] }));
-    const updated = await repos.clientProfiles.update(UUID, {
-      clientRef: 'CRM-1',
-      label: null,
-      riskAppetite: 'low',
-      horizonMonths: 1,
-      lossTolerancePct: 1,
-      concentrationPct: 1,
-    });
-    expect(updated).toBe(false);
-    expect(calls[0]).toMatchObject({ method: 'PATCH' });
-    expect(calls[0]!.search.get('id')).toBe(`eq.${UUID}`);
   });
 
   const modeBInput = (riskResults: ModeBSimulationInput['riskResults']): ModeBSimulationInput => ({
     mode: 'B',
     configurationId: UUID,
-    profileId: null,
     profileSnapshot: null,
     levelValue: 25_000,
     levelSource: 'live',
@@ -247,7 +286,6 @@ describe('Supabase repositories (fake PostgREST)', () => {
     const ts = '2026-10-03T21:00:01.000001+00:00';
     const row = {
       id: UUID,
-      profile_id: null,
       configuration: {
         id: UUID,
         product_type: 'CPN',
@@ -261,9 +299,9 @@ describe('Supabase repositories (fake PostgREST)', () => {
       },
       mode: 'B',
       profile_snapshot: {
-        clientRef: 'C',
-        label: null,
-        riskAppetite: 'LOW',
+        name: 'Asha Rao',
+        age: 52,
+        riskAppetite: 'low',
         horizonMonths: 1,
         lossTolerancePct: 1,
         concentrationPct: 1,
@@ -312,7 +350,7 @@ describe('Supabase repositories (fake PostgREST)', () => {
       id: UUID,
       mode: 'B',
       levelSource: 'manual',
-      profileSnapshot: { riskAppetite: 'low' },
+      profileSnapshot: { name: 'Asha Rao', age: 52, riskAppetite: 'low' },
       riskResults: [{ scenario: 'shock', returnPct: 3 }],
       suitability: { verdict: 'Not suitable', id: UUID, rulesVersion: 'v1' },
       configuration: { id: UUID, productType: 'CPN', createdAt: '2026-10-03T21:00:00.123Z' },

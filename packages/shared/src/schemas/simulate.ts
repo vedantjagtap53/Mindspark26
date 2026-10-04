@@ -5,7 +5,11 @@
 // Mode A (forecast): the forecast service's case and sample paths go through the same engines.
 
 import { z } from 'zod';
-import { DEFAULT_TRAINING_WINDOW_YEARS } from '../constants/forecast.js';
+import {
+  DEFAULT_TRAINING_WINDOW_YEARS,
+  TRAINING_WINDOW_YEARS_MAX,
+  TRAINING_WINDOW_YEARS_MIN,
+} from '../constants/forecast.js';
 import { cpnTermsSchema, dcdTermsSchema, elnTermsSchema } from './product.js';
 
 export const LEVEL_SOURCES = ['live', 'manual', 'reference'] as const;
@@ -120,7 +124,9 @@ export const SCENARIO_SHOCKS: readonly number[] = [-25, -10, 0, 15];
 const modeA = {
   mode: z.literal('A'),
   trainingWindowYears: z
-    .union([z.literal(5), z.literal(10)])
+    .number()
+    .min(TRAINING_WINDOW_YEARS_MIN)
+    .max(TRAINING_WINDOW_YEARS_MAX)
     .default(DEFAULT_TRAINING_WINDOW_YEARS),
 };
 

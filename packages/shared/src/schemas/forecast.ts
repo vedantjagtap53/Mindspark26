@@ -9,6 +9,8 @@ import {
   FORECAST_CASE_PERCENTILES,
   FORECAST_CONTRACT_VERSION,
   FORECAST_MAX_STALENESS_DAYS,
+  TRAINING_WINDOW_YEARS_MAX,
+  TRAINING_WINDOW_YEARS_MIN,
   SAMPLE_PATH_COUNT_MAX,
   SAMPLE_PATH_COUNT_MIN,
   TENOR_DAYS_MAX,
@@ -28,7 +30,9 @@ export const forecastRequestSchema = z.object({
   }),
   tenorDays: z.number().int().min(TENOR_DAYS_MIN).max(TENOR_DAYS_MAX),
   trainingWindowYears: z
-    .union([z.literal(5), z.literal(10)])
+    .number()
+    .min(TRAINING_WINDOW_YEARS_MIN)
+    .max(TRAINING_WINDOW_YEARS_MAX)
     .default(DEFAULT_TRAINING_WINDOW_YEARS),
   samplePathCount: z
     .number()

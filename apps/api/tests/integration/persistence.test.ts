@@ -1,8 +1,8 @@
-// Persistence through the real app with the test-only in-memory repositories, and
-// /api/client-profiles. The Supabase adapter itself is covered by the contract suite in tests/supabase.
+// Persistence through the real app with the test-only in-memory repositories. The Supabase adapter
+// itself is covered by the contract suite in tests/supabase.
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
-import type { SavedProfile, SuitabilityResponse } from '@mindspark/shared';
+import type { SuitabilityResponse } from '@mindspark/shared';
 import { createApp } from '../../src/app.js';
 import { parseEnv } from '../../src/config/env.js';
 import { buildConfig } from '../../src/config/index.js';
@@ -13,9 +13,13 @@ import { silentLogger } from '../../src/utils/logger.js';
 import { createMemoryRepositories } from '../support/memoryRepositories.js';
 import { errorBody } from '../helpers/http.js';
 
+/** Every context the explain stub received, to check what would be sent to the AI service. */
+const explainContexts: unknown[] = [];
+
 const rag: RagClient = {
-  explain: (ctx) =>
-    Promise.resolve({
+  explain: (ctx) => {
+    explainContexts.push(ctx);
+    return Promise.resolve({
       simulation_id: ctx.simulation_id,
       verdict: ctx.suitability.verdict,
       sections: {
@@ -31,7 +35,8 @@ const rag: RagClient = {
       guardrail_violations: [],
       sources: ['eln.md'],
       model_name: 'fake-llm',
-    }),
+    });
+  },
   chat: () => Promise.reject(new Error('unused')),
 };
 
@@ -52,12 +57,13 @@ const eln = {
   barrierType: 'European',
 };
 const profile = {
+  name: 'Asha Rao',
+  age: 52,
   riskAppetite: 'high',
   horizonMonths: 24,
   lossTolerancePct: 50,
   concentrationPct: 10,
 };
-const saved = { clientRef: 'CL-0042', label: 'Retirement', ...profile };
 
 async function simulate(app: ReturnType<typeof appWith>): Promise<string> {
   const res = await request(app)
@@ -73,103 +79,117 @@ async function simulate(app: ReturnType<typeof appWith>): Promise<string> {
   return (res.body as { simulationId: string }).simulationId;
 }
 
-describe('/api/client-profiles', () => {
-  it('creates, reads, lists and replaces a saved profile', async () => {
+/** Memory repositories that remember the id of each simulation row written. */
+function trackedRepositories() {
+  const repos = createMemoryRepositories();
+  const ids: string[] = [];
+  const record = repos.simulations.record.bind(repos.simulations);
+  repos.simulations.record = async (input) => {
+    const id = await record(input);
+    ids.push(id);
+    return id;
+  };
+  return { repos, ids };
+}
+
+describe('client profile on /api/suitability', () => {
+  it('requires a name and an age within range', async () => {
     const app = appWith(createMemoryRepositories());
-    const created = await request(app).post('/api/client-profiles').send(saved);
-    expect(created.status).toBe(201);
-    const p = created.body as SavedProfile;
-    expect(p).toMatchObject({ clientRef: 'CL-0042', label: 'Retirement', riskAppetite: 'high' });
+    const simulationId = await simulate(app);
+    const send = (p: Record<string, unknown>) =>
+      request(app).post('/api/suitability').send({ simulationId, profile: p });
 
-    const list = await request(app).get('/api/client-profiles');
-    expect((list.body as { profiles: SavedProfile[] }).profiles.map((x) => x.id)).toEqual([p.id]);
-
-    const updated = await request(app)
-      .put(`/api/client-profiles/${p.id}`)
-      .send({ ...saved, lossTolerancePct: 20 });
-    expect(updated.status).toBe(200);
-    expect((updated.body as SavedProfile).lossTolerancePct).toBe(20);
-    const got = await request(app).get(`/api/client-profiles/${p.id}`);
-    expect((got.body as SavedProfile).lossTolerancePct).toBe(20);
+    const { name: _name, ...noName } = profile;
+    const { age: _age, ...noAge } = profile;
+    for (const bad of [
+      noName,
+      noAge,
+      { ...profile, name: '   ' },
+      { ...profile, name: 'x'.repeat(121) },
+      { ...profile, age: 17 },
+      { ...profile, age: 121 },
+      { ...profile, age: 52.5 },
+    ]) {
+      const res = await send(bad);
+      expect(res.status, JSON.stringify(bad)).toBe(400);
+      expect(errorBody(res).code).toBe('VALIDATION_ERROR');
+    }
+    expect((await send(profile)).status).toBe(200);
   });
 
-  it('validates input, rejects duplicates and unknown ids', async () => {
-    const app = appWith(createMemoryRepositories());
-    const bad = await request(app)
-      .post('/api/client-profiles')
-      .send({ ...saved, lossTolerancePct: 150 });
-    expect(bad.status).toBe(400);
-    const name = await request(app)
-      .post('/api/client-profiles')
-      .send({ ...saved, fullName: 'x' });
-    expect(name.status).toBe(400);
-
-    await request(app).post('/api/client-profiles').send(saved);
-    const dup = await request(app).post('/api/client-profiles').send(saved);
-    expect(dup.status).toBe(409);
-    expect(errorBody(dup).code).toBe('CONFLICT');
-
-    const unknown = await request(app).get(
-      '/api/client-profiles/6f1c1f5e-3b0a-4a76-9b2c-1d2e3f4a5b6c',
-    );
-    expect(unknown.status).toBe(404);
-    const badId = await request(app).get('/api/client-profiles/nope');
-    expect(badId.status).toBe(400);
-  });
-
-  it('says so when the database is not configured', async () => {
-    const res = await request(appWith(undefined)).get('/api/client-profiles');
-    expect(res.status).toBe(503);
-    expect(errorBody(res).code).toBe('DATABASE_NOT_CONFIGURED');
+  it('gives the same verdict whatever the name and age are', async () => {
+    const app = appWith(undefined);
+    const simulationId = await simulate(app);
+    const verdictFor = async (p: object) =>
+      (await request(app).post('/api/suitability').send({ simulationId, profile: p })).body as {
+        verdict: string;
+        flags: unknown;
+      };
+    const a = await verdictFor(profile);
+    const b = await verdictFor({ ...profile, name: 'Someone Else', age: 90 });
+    expect(b).toEqual(a);
   });
 });
 
 describe('persistence of simulation, verdict and explanation', () => {
-  it('writes the audit record linked to the saved profile, with a frozen snapshot', async () => {
-    const repos = createMemoryRepositories();
+  it('writes the audit record with the client as entered, name and age included', async () => {
+    const { repos, ids } = trackedRepositories();
     const app = appWith(repos);
-    const profileId = (
-      (await request(app).post('/api/client-profiles').send(saved)).body as SavedProfile
-    ).id;
     const simulationId = await simulate(app);
 
-    const suit = await request(app)
-      .post('/api/suitability')
-      .send({ simulationId, profile, profileId });
+    const suit = await request(app).post('/api/suitability').send({ simulationId, profile });
     expect(suit.status).toBe(200);
     const body = suit.body as SuitabilityResponse;
     expect(body.persisted).toBe(true);
 
-    const [summary] = await repos.simulations.listForProfile(profileId, 10);
-    expect(summary).toMatchObject({ mode: 'B', productType: 'ELN', verdict: body.verdict });
-    const record = await repos.simulations.getById(summary!.id);
+    expect(ids).toHaveLength(1);
+    const record = await repos.simulations.getById(ids[0]!);
     expect(record).toMatchObject({
       mode: 'B',
       shockPct: -10,
       levelSource: 'manual',
-      profileSnapshot: { clientRef: 'CL-0042', riskAppetite: 'high', lossTolerancePct: 50 },
+      profileSnapshot: profile,
       suitability: { verdict: body.verdict, rulesVersion: expect.any(String) as unknown },
     });
     expect(record!.riskResults).toHaveLength(1);
     expect(record!.configuration.terms).toMatchObject({ barrierPct: 80 });
 
-    // Editing the profile later does not change the evidence.
-    await request(app)
-      .put(`/api/client-profiles/${profileId}`)
-      .send({ ...saved, lossTolerancePct: 1 });
-    const again = await repos.simulations.getById(summary!.id);
-    expect(again!.profileSnapshot?.lossTolerancePct).toBe(50);
-
     await request(app).post('/api/explain').send({ simulationId });
-    expect((await repos.simulations.getById(summary!.id))!.explanations).toHaveLength(1);
+    expect((await repos.simulations.getById(ids[0]!))!.explanations).toHaveLength(1);
   });
 
-  it('stores an ad hoc profile as a snapshot only', async () => {
-    const repos = createMemoryRepositories();
+  it('writes another record when the same run is assessed for another client', async () => {
+    const { repos, ids } = trackedRepositories();
     const app = appWith(repos);
     const simulationId = await simulate(app);
-    const res = await request(app).post('/api/suitability').send({ simulationId, profile });
-    expect((res.body as SuitabilityResponse).persisted).toBe(true);
+    await request(app).post('/api/suitability').send({ simulationId, profile });
+    await request(app)
+      .post('/api/suitability')
+      .send({ simulationId, profile: { ...profile, name: 'Ravi Menon', age: 61 } });
+    expect(ids).toHaveLength(2);
+    expect((await repos.simulations.getById(ids[1]!))!.profileSnapshot).toMatchObject({
+      name: 'Ravi Menon',
+      age: 61,
+    });
+    // One configuration is reused across both assessments of the run.
+    const [first, second] = await Promise.all(ids.map((id) => repos.simulations.getById(id)));
+    expect(first!.configuration.id).toBe(second!.configuration.id);
+  });
+
+  it('never sends the name or age to the AI service', async () => {
+    const app = appWith(createMemoryRepositories());
+    const simulationId = await simulate(app);
+    await request(app).post('/api/suitability').send({ simulationId, profile });
+    explainContexts.length = 0;
+    const res = await request(app).post('/api/explain').send({ simulationId });
+    expect(res.status).toBe(200);
+    expect(explainContexts).toHaveLength(1);
+    const sent = JSON.stringify(explainContexts[0]);
+    expect(sent).not.toContain('Asha');
+    expect(sent).not.toMatch(/"age"|"name"/);
+    expect(explainContexts[0]).toMatchObject({
+      profile: { risk_appetite: 'high', loss_tolerance_pct: 50, concentration_pct: 10 },
+    });
   });
 
   it('does not persist, and says so, without a database', async () => {
@@ -189,14 +209,5 @@ describe('persistence of simulation, verdict and explanation', () => {
     const res = await request(app).post('/api/suitability').send({ simulationId, profile });
     expect(res.status).toBe(500);
     expect(errorBody(res).code).toBe('DATABASE_ERROR');
-  });
-
-  it('rejects an unknown saved profile id', async () => {
-    const app = appWith(createMemoryRepositories());
-    const simulationId = await simulate(app);
-    const res = await request(app)
-      .post('/api/suitability')
-      .send({ simulationId, profile, profileId: '6f1c1f5e-3b0a-4a76-9b2c-1d2e3f4a5b6c' });
-    expect(res.status).toBe(404);
   });
 });

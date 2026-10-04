@@ -18,6 +18,7 @@ import {
   DEFAULT_FORMS,
   DEFAULT_PROFILE,
   DEFAULT_RUN,
+  profileBlocker,
   runSettingsFor,
   type Forms,
   type ProductType,
@@ -121,6 +122,7 @@ export function App() {
             run={run}
             onRun={setRun}
             termIssueCount={issueCount}
+            profileIssue={profileBlocker(profile)}
             loading={sim.loading}
             elapsedSeconds={sim.elapsedSeconds}
             onExecute={execute}

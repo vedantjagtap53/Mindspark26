@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   RepositoryError,
-  type ClientProfileInput,
+  type ClientProfileSnapshot,
   type ModeASimulationInput,
   type ModeBSimulationInput,
   type ProductConfigurationInput,
@@ -13,12 +13,11 @@ import {
   type SimulationInput,
 } from '../../src/repositories/interfaces/index.js';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const MISSING = '00000000-0000-4000-8000-000000000000';
 
-const profileInput = (over: Partial<ClientProfileInput> = {}): ClientProfileInput => ({
-  clientRef: 'CRM-001',
-  label: 'Test client',
+const profileInput = (over: Partial<ClientProfileSnapshot> = {}): ClientProfileSnapshot => ({
+  name: 'Asha Rao',
+  age: 52,
   riskAppetite: 'medium',
   horizonMonths: 24,
   lossTolerancePct: 10,
@@ -68,10 +67,9 @@ const shockResult: RiskResultInput = {
   details: { payoff: 850_000 },
 };
 
-const modeA = (configurationId: string, profileId: string | null): ModeASimulationInput => ({
+const modeA = (configurationId: string): ModeASimulationInput => ({
   mode: 'A',
   configurationId,
-  profileId,
   profileSnapshot: profileInput(),
   trainingWindowYears: 10,
   forecastMeta: { contractVersion: '1.0', model: { name: 'garch11-t-montecarlo' } },
@@ -86,10 +84,9 @@ const modeA = (configurationId: string, profileId: string | null): ModeASimulati
   ],
 });
 
-const modeB = (configurationId: string, profileId: string | null): ModeBSimulationInput => ({
+const modeB = (configurationId: string): ModeBSimulationInput => ({
   mode: 'B',
   configurationId,
-  profileId,
   profileSnapshot: null,
   levelValue: 25_000,
   levelSource: 'manual',
@@ -115,57 +112,6 @@ export function runRepositoryContract(name: string, make: () => Promise<Reposito
       repos = await make();
     });
 
-    describe('client profiles', () => {
-      it('creates, reads by id and by reference', async () => {
-        const id = await repos.clientProfiles.create(profileInput());
-        expect(id).toMatch(UUID);
-        const byId = await repos.clientProfiles.getById(id);
-        expect(byId).toMatchObject({ ...profileInput(), id });
-        expect(byId?.createdAt).toBe(byId?.updatedAt);
-        expect(await repos.clientProfiles.getByRef('CRM-001')).toEqual(byId);
-      });
-
-      it('returns null for unknown ids and references', async () => {
-        expect(await repos.clientProfiles.getById(MISSING)).toBeNull();
-        expect(await repos.clientProfiles.getByRef('nobody')).toBeNull();
-      });
-
-      it('rejects a duplicate client reference', async () => {
-        await repos.clientProfiles.create(profileInput());
-        await expectRepoError(repos.clientProfiles.create(profileInput()), 'conflict');
-      });
-
-      it('updates editable fields and moves updatedAt', async () => {
-        const id = await repos.clientProfiles.create(profileInput());
-        const before = await repos.clientProfiles.getById(id);
-        const changed = profileInput({ riskAppetite: 'high', label: null });
-        expect(await repos.clientProfiles.update(id, changed)).toBe(true);
-        const after = await repos.clientProfiles.getById(id);
-        expect(after).toMatchObject({ ...changed, createdAt: before?.createdAt });
-        expect(after!.updatedAt > before!.updatedAt).toBe(true);
-      });
-
-      it('update of an unknown id returns false', async () => {
-        expect(await repos.clientProfiles.update(MISSING, profileInput())).toBe(false);
-      });
-
-      it("update cannot take another client's reference", async () => {
-        await repos.clientProfiles.create(profileInput());
-        const other = await repos.clientProfiles.create(profileInput({ clientRef: 'CRM-002' }));
-        await expectRepoError(repos.clientProfiles.update(other, profileInput()), 'conflict');
-      });
-
-      it('lists most recently updated first, with paging', async () => {
-        const a = await repos.clientProfiles.create(profileInput({ clientRef: 'A' }));
-        const b = await repos.clientProfiles.create(profileInput({ clientRef: 'B' }));
-        await repos.clientProfiles.update(a, profileInput({ clientRef: 'A', horizonMonths: 36 }));
-        const all = await repos.clientProfiles.list({ limit: 10, offset: 0 });
-        expect(all.map((p) => p.id)).toEqual([a, b]);
-        const page = await repos.clientProfiles.list({ limit: 1, offset: 1 });
-        expect(page.map((p) => p.id)).toEqual([b]);
-      });
-    });
-
     describe('product configurations', () => {
       it('creates and reads back the full terms', async () => {
         const id = await repos.productConfigurations.create(elnConfig);
@@ -176,19 +122,17 @@ export function runRepositoryContract(name: string, make: () => Promise<Reposito
 
     describe('simulations', () => {
       let configurationId: string;
-      let profileId: string;
       beforeEach(async () => {
         configurationId = await repos.productConfigurations.create(elnConfig);
-        profileId = await repos.clientProfiles.create(profileInput());
       });
 
       it('records a Mode A simulation with its three case results', async () => {
-        const id = await repos.simulations.record(modeA(configurationId, profileId));
+        const id = await repos.simulations.record(modeA(configurationId));
         const rec = await repos.simulations.getById(id);
         expect(rec).toMatchObject({
           id,
           mode: 'A',
-          profileId,
+          profileSnapshot: profileInput(),
           trainingWindowYears: 10,
           probabilityOfKnockIn: 0.032,
           payoffQuantiles: { p5: 1_100_000, p50: 1_100_000, p95: 1_100_000 },
@@ -204,12 +148,23 @@ export function runRepositoryContract(name: string, make: () => Promise<Reposito
         });
       });
 
+      it('stores a fractional training window (30 days to 3 years) exactly', async () => {
+        for (const years of [30 / 365, 0.5, 2.4, 3]) {
+          const id = await repos.simulations.record({
+            ...modeA(configurationId),
+            trainingWindowYears: years,
+          });
+          const rec = await repos.simulations.getById(id);
+          expect(rec?.mode === 'A' && rec.trainingWindowYears).toBe(years);
+        }
+      });
+
       it('records a Mode B simulation with its shock result', async () => {
-        const id = await repos.simulations.record(modeB(configurationId, null));
+        const id = await repos.simulations.record(modeB(configurationId));
         const rec = await repos.simulations.getById(id);
         expect(rec).toMatchObject({
           mode: 'B',
-          profileId: null,
+          profileSnapshot: null,
           levelSource: 'manual',
           levelAsOf: null,
           shockPct: -25,
@@ -218,82 +173,57 @@ export function runRepositoryContract(name: string, make: () => Promise<Reposito
         expect(rec?.riskResults[0]).toMatchObject({ ...shockResult });
       });
 
-      it('keeps the frozen profile snapshot when the profile is later edited', async () => {
-        const id = await repos.simulations.record(modeA(configurationId, profileId));
-        await repos.clientProfiles.update(profileId, profileInput({ riskAppetite: 'high' }));
-        expect((await repos.simulations.getById(id))?.profileSnapshot).toEqual(profileInput());
+      it('stores the client as entered (name, age and the rule fields) with the simulation', async () => {
+        const id = await repos.simulations.record(modeA(configurationId));
+        const snapshot = (await repos.simulations.getById(id))?.profileSnapshot;
+        expect(snapshot).toEqual(profileInput());
+        expect(snapshot).toMatchObject({ name: 'Asha Rao', age: 52 });
       });
 
       it('returns null for an unknown simulation', async () => {
         expect(await repos.simulations.getById(MISSING)).toBeNull();
       });
 
-      const badInputs: Array<
-        [string, (c: string, p: string) => SimulationInput, RepositoryErrorKind]
-      > = [
-        ['an unknown configuration', (_c, p) => modeA(MISSING, p), 'invalid_reference'],
-        ['an unknown profile', (c) => modeA(c, MISSING), 'invalid_reference'],
+      const badInputs: Array<[string, (c: string) => SimulationInput, RepositoryErrorKind]> = [
+        ['an unknown configuration', () => modeA(MISSING), 'invalid_reference'],
         [
           'Mode A missing a case',
-          (c, p) => ({ ...modeA(c, p), riskResults: modeA(c, p).riskResults.slice(0, 2) }),
+          (c) => ({ ...modeA(c), riskResults: modeA(c).riskResults.slice(0, 2) }),
           'invalid_input',
         ],
         [
           'duplicate scenarios',
-          (c, p) => ({
-            ...modeA(c, p),
+          (c) => ({
+            ...modeA(c),
             riskResults: [caseResult('low', 1), caseResult('low', 2), caseResult('high', 3)],
           }),
           'invalid_input',
         ],
         [
           'Mode B with case rows',
-          (c, p) => ({ ...modeB(c, p), riskResults: modeA(c, p).riskResults }),
+          (c) => ({ ...modeB(c), riskResults: modeA(c).riskResults }),
           'invalid_input',
         ],
         [
           'Mode A with a shock row',
-          (c, p) => ({
-            ...modeA(c, p),
-            riskResults: [...modeA(c, p).riskResults.slice(0, 2), shockResult],
+          (c) => ({
+            ...modeA(c),
+            riskResults: [...modeA(c).riskResults.slice(0, 2), shockResult],
           }),
           'invalid_input',
         ],
         [
           'more than four results',
-          (c, p) => ({
-            ...modeA(c, p),
-            riskResults: [...modeA(c, p).riskResults, caseResult('low', 1), caseResult('base', 1)],
+          (c) => ({
+            ...modeA(c),
+            riskResults: [...modeA(c).riskResults, caseResult('low', 1), caseResult('base', 1)],
           }),
           'invalid_input',
         ],
       ];
 
-      it.each(badInputs)('rejects %s and writes nothing', async (_name, build, kind) => {
-        await expectRepoError(repos.simulations.record(build(configurationId, profileId)), kind);
-        expect(await repos.simulations.listForProfile(profileId, 10)).toEqual([]);
-      });
-
-      it('lists a profile’s simulations newest first with their verdicts', async () => {
-        const first = await repos.simulations.record(modeA(configurationId, profileId));
-        const second = await repos.simulations.record(modeB(configurationId, profileId));
-        await repos.suitabilityResults.create({
-          simulationId: first,
-          verdict: 'Caution',
-          flags: [],
-          rulesVersion: 'v1',
-        });
-        const list = await repos.simulations.listForProfile(profileId, 10);
-        expect(list.map((s) => s.id)).toEqual([second, first]);
-        expect(list[1]).toMatchObject({
-          mode: 'A',
-          productType: 'ELN',
-          tenorDays: 365,
-          notional: 1_000_000,
-          verdict: 'Caution',
-        });
-        expect(list[0]?.verdict).toBeNull();
-        expect(await repos.simulations.listForProfile(profileId, 1)).toHaveLength(1);
+      it.each(badInputs)('rejects %s', async (_name, build, kind) => {
+        await expectRepoError(repos.simulations.record(build(configurationId)), kind);
       });
     });
 
@@ -301,7 +231,7 @@ export function runRepositoryContract(name: string, make: () => Promise<Reposito
       let simulationId: string;
       beforeEach(async () => {
         const configurationId = await repos.productConfigurations.create(elnConfig);
-        simulationId = await repos.simulations.record(modeB(configurationId, null));
+        simulationId = await repos.simulations.record(modeB(configurationId));
       });
 
       it('stores one verdict per simulation', async () => {

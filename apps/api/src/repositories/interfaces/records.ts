@@ -3,6 +3,7 @@
 // Percent fields are percent numbers; probabilities are fractions. Timestamps are ISO strings.
 
 import type {
+  ClientProfile,
   ForecastCase,
   LevelSource,
   ProductType,
@@ -10,33 +11,18 @@ import type {
   SuitabilityVerdict,
 } from '@mindspark/shared';
 
-export const RISK_APPETITES = ['low', 'medium', 'high'] as const;
-export type RiskAppetite = (typeof RISK_APPETITES)[number];
-
 /** Mode A cases, or the single Mode B shock. */
 export type ScenarioCase = ForecastCase | 'shock';
 
 export type JsonObject = Record<string, unknown>;
 
-// ---- client profiles ----
+// ---- client profile (frozen with each simulation) ----
 
-export interface ClientProfileInput {
-  /** The RM's own reference for the client (e.g. a CRM id). Never a name. Unique. */
-  clientRef: string;
-  label: string | null;
-  riskAppetite: RiskAppetite;
-  horizonMonths: number;
-  /** Percent of notional, 0–100. */
-  lossTolerancePct: number;
-  /** Percent of portfolio, 0–100. */
-  concentrationPct: number;
-}
-
-export interface ClientProfileRecord extends ClientProfileInput {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-}
+/**
+ * The client as the RM entered it when the simulation ran: name, age and the four rule fields.
+ * Stored with the simulation as evidence; there is no editable saved profile.
+ */
+export type ClientProfileSnapshot = ClientProfile;
 
 // ---- product configurations (never edited) ----
 
@@ -82,10 +68,8 @@ export interface RiskResultRecord extends RiskResultInput {
 
 interface SimulationInputBase {
   configurationId: string;
-  /** Saved profile used, if any. */
-  profileId: string | null;
-  /** Frozen copy of the profile at simulation time; the audit record. */
-  profileSnapshot: ClientProfileInput | null;
+  /** The client as entered at simulation time; the audit record. */
+  profileSnapshot: ClientProfileSnapshot | null;
   riskResults: RiskResultInput[];
 }
 
@@ -159,13 +143,3 @@ type StoredFields<T> = Omit<T, 'riskResults' | 'configurationId'>;
 export type SimulationRecord =
   | (StoredFields<ModeASimulationInput> & SimulationRecordExtra)
   | (StoredFields<ModeBSimulationInput> & SimulationRecordExtra);
-
-export interface SimulationSummary {
-  id: string;
-  mode: SimulationMode;
-  createdAt: string;
-  productType: ProductType;
-  tenorDays: number;
-  notional: number;
-  verdict: SuitabilityVerdict | null;
-}

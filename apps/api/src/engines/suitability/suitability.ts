@@ -4,7 +4,7 @@
 // (default 25%). Mode B low case is the worst outcome among the scenario shocks and the RM's shock.
 
 import type {
-  ClientProfile,
+  SuitabilityProfile,
   ProductType,
   SuitabilityFlag,
   SuitabilityVerdict,
@@ -31,7 +31,8 @@ export interface SuitabilityInput {
   tenorDays: number;
   lowCase: CaseOutcome;
   baseCase: CaseOutcome;
-  profile: ClientProfile;
+  /** Only the rule fields: name and age are display-only and never reach the rules. */
+  profile: SuitabilityProfile;
   concentrationLimitPct: number;
 }
 

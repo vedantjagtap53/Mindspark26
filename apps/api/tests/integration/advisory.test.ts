@@ -74,6 +74,8 @@ const eln = {
   barrierType: 'European',
 };
 const profile = {
+  name: 'Asha Rao',
+  age: 52,
   riskAppetite: 'high',
   horizonMonths: 24,
   lossTolerancePct: 10,

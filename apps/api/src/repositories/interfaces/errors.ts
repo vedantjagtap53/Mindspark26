@@ -6,9 +6,9 @@ export type RepositoryErrorKind =
   | 'not_configured'
   /** The database could not be reached or failed; nothing was written. */
   | 'unavailable'
-  /** A uniqueness rule was violated (duplicate clientRef, second verdict for a simulation). */
+  /** A uniqueness rule was violated (a second verdict for the same simulation). */
   | 'conflict'
-  /** A referenced row does not exist (unknown configuration, profile or simulation id). */
+  /** A referenced row does not exist (unknown configuration or simulation id). */
   | 'invalid_reference'
   /** The input breaks a repository rule (e.g. too many or mismatched risk results). */
   | 'invalid_input';

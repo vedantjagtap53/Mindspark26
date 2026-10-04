@@ -19,8 +19,6 @@ import { createAdvisoryController } from '../controllers/advisoryController.js';
 import { createAdvisoryService } from '../services/ai/advisoryService.js';
 import type { RagClient } from '../services/ai/ragClient.js';
 import type { SimulationRecords } from '../services/simulation/simulationRecords.js';
-import { createClientProfileController } from '../controllers/clientProfileController.js';
-import { createClientProfileService } from '../services/clientProfiles/clientProfileService.js';
 import { createPersistenceService } from '../services/persistence/persistenceService.js';
 import type { Repositories } from '../repositories/interfaces/index.js';
 import { createSuitabilityService } from '../services/suitability/suitabilityService.js';
@@ -73,11 +71,5 @@ export function createApiRouter(config: AppConfig, deps: ApiDeps): Router {
   router.post(API_ROUTES.suitability, advisory.suitability);
   router.post(API_ROUTES.explain, advisory.explain);
   router.post(API_ROUTES.chat, advisory.chat);
-
-  const profiles = createClientProfileController(createClientProfileService(deps.repositories));
-  router.get(API_ROUTES.clientProfiles, profiles.list);
-  router.post(API_ROUTES.clientProfiles, profiles.create);
-  router.get(`${API_ROUTES.clientProfiles}/:id`, profiles.get);
-  router.put(`${API_ROUTES.clientProfiles}/:id`, profiles.update);
   return router;
 }

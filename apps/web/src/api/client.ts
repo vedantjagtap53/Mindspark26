@@ -7,8 +7,6 @@ import type {
   SuitabilityResponse,
   SimulateModeAResponse,
   SimulateModeBResponse,
-  SavedProfile,
-  SavedProfileList,
   ValidationIssue,
 } from '@mindspark/shared';
 
@@ -79,10 +77,4 @@ export const api = {
     postJson<ExplainResponse>('/api/explain', body, fetchImpl),
   chat: (body: unknown, fetchImpl?: typeof fetch) =>
     postJson<ChatResponse>('/api/chat', body, fetchImpl),
-  listProfiles: (fetchImpl?: typeof fetch) =>
-    requestJson<SavedProfileList>('GET', '/api/client-profiles', undefined, fetchImpl),
-  createProfile: (body: unknown, fetchImpl?: typeof fetch) =>
-    requestJson<SavedProfile>('POST', '/api/client-profiles', body, fetchImpl),
-  updateProfile: (id: string, body: unknown, fetchImpl?: typeof fetch) =>
-    requestJson<SavedProfile>('PUT', `/api/client-profiles/${id}`, body, fetchImpl),
 };

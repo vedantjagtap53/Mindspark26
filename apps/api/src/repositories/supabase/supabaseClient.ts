@@ -12,8 +12,30 @@ export const DB_TIMEOUT_MS = 10_000;
 /** Shape of every supabase-js query result (PostgrestError fields kept loose on purpose). */
 export interface DbResult {
   data: unknown;
-  error: { code?: string; message: string } | null;
+  error: { code?: string; message: string; details?: string | null } | null;
   status: number;
+}
+
+/**
+ * Failures that happen while connecting, before a request leaves this machine. Only these are
+ * retried, so a write can never be applied twice.
+ */
+const CONNECT_PHASE_CODES = new Set([
+  'ECONNREFUSED',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'ENETUNREACH',
+  'EHOSTUNREACH',
+  'UND_ERR_CONNECT_TIMEOUT',
+]);
+const CONNECT_RETRY_DELAYS_MS = [300, 900];
+
+/** The Node error code behind a failed fetch (`TypeError: fetch failed` hides it in `cause`). */
+function causeCode(err: unknown): string | undefined {
+  const cause = (err as { cause?: { code?: unknown; errors?: unknown[] } } | null)?.cause;
+  const nested = Array.isArray(cause?.errors) ? (cause.errors[0] as { code?: unknown }) : undefined;
+  const code = cause?.code ?? nested?.code;
+  return typeof code === 'string' ? code : undefined;
 }
 
 /** Maps any SDK, PostgREST, Postgres or network failure to a database-neutral RepositoryError. */
@@ -42,8 +64,16 @@ export function toRepositoryError(err: unknown, status = 0): RepositoryError {
     );
   }
   if (status === 0) {
-    // fetch failures and timeouts carry no HTTP status.
-    return new RepositoryError('unavailable', 'Supabase is unreachable');
+    // fetch failures and timeouts carry no HTTP status. Say why: it is the only clue.
+    const details = (err as { details?: unknown } | null)?.details;
+    const why = [message, typeof details === 'string' ? details : ''].filter(Boolean).join(': ');
+    if (/AbortError|TimeoutError|aborted due to timeout/i.test(why)) {
+      return new RepositoryError(
+        'unavailable',
+        `Supabase did not answer within ${DB_TIMEOUT_MS / 1000} s (${why})`,
+      );
+    }
+    return new RepositoryError('unavailable', `Supabase is unreachable (${why || 'no detail'})`);
   }
   if (!code) {
     // An HTTP answer without a PostgREST error code: usually a wrong SUPABASE_URL.
@@ -70,10 +100,20 @@ export function createSupabaseClient(db: AppConfig['database'], fetchImpl: typeo
       'Supabase is not configured (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)',
     );
   }
-  const timedFetch: typeof fetch = (input, init) => {
-    const timeout = AbortSignal.timeout(DB_TIMEOUT_MS);
-    const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
-    return fetchImpl(input, { ...init, signal });
+  const timedFetch: typeof fetch = async (input, init) => {
+    for (let attempt = 0; ; attempt++) {
+      // A fresh timeout per attempt: each try gets the full time to connect and answer.
+      const timeout = AbortSignal.timeout(DB_TIMEOUT_MS);
+      const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
+      try {
+        return await fetchImpl(input, { ...init, signal });
+      } catch (err) {
+        const code = causeCode(err);
+        const delay = CONNECT_RETRY_DELAYS_MS[attempt];
+        if (delay === undefined || !code || !CONNECT_PHASE_CODES.has(code)) throw err;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
   };
   return createClient(db.url, db.serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },

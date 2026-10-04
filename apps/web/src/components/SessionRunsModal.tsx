@@ -124,7 +124,7 @@ export function SessionRunsModal({ runs, onLoad, onPrint, onClose }: Props) {
                       {selected.product} ({underlyingLabel(selected)})
                     </h2>
                     <div className="text-xs text-[var(--ink-muted)] mt-1">
-                      Client {selected.profile.clientRef || '(no reference)'} · risk appetite{' '}
+                      Client {selected.profile.name || '(not entered)'} · risk appetite{' '}
                       {selected.profile.riskAppetite}
                     </div>
                   </div>

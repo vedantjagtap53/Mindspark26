@@ -4,7 +4,7 @@ Source: `PRD.md` §7.3. The forecast service is **owned by the AI/ML developer**
 
 ## Method (agreed, implemented by the AI/ML developer)
 
-1. Load daily closes for the underlying over the training window (default 10 years, optional 5). Keep the COVID period.
+1. Load daily closes for the underlying over the training window, chosen by the RM: 30 days to 3 years (default 3 years; changed from "10 years, optional 5" on 2026-10-04 at the repo owner's request, not yet agreed with the forecast owner). A window this short may not include the COVID period, and a very short one leaves too few returns for a stable GARCH fit.
 2. Compute daily log returns `r_t = ln(P_t / P_{t-1})`.
 3. Fit GARCH(1,1) with Student-t errors (e.g. Python `arch`).
 4. `tradingDays = round(tenorDays × 252 / 365)`.
@@ -24,18 +24,18 @@ Source: `PRD.md` §7.3. The forecast service is **owned by the AI/ML developer**
 {
   "underlying": { "symbol": "^NSEI", "assetClass": "index" },
   "tenorDays": 182,
-  "trainingWindowYears": 10,
+  "trainingWindowYears": 3,
   "samplePathCount": 500
 }
 ```
 
-| Field                   | Rule                               |
-| ----------------------- | ---------------------------------- |
-| `underlying.symbol`     | Non-empty string.                  |
-| `underlying.assetClass` | `index`, `equity` or `fx`.         |
-| `tenorDays`             | Integer, 30–1,095.                 |
-| `trainingWindowYears`   | `5` or `10`. Default `10`.         |
-| `samplePathCount`       | Integer, 100–2,000. Default `500`. |
+| Field                   | Rule                                                                   |
+| ----------------------- | ---------------------------------------------------------------------- |
+| `underlying.symbol`     | Non-empty string.                                                      |
+| `underlying.assetClass` | `index`, `equity` or `fx`.                                             |
+| `tenorDays`             | Integer, 30–1,095.                                                     |
+| `trainingWindowYears`   | Number of years, from 30/365 (30 days) to 3 (1,095 days). Default `3`. |
+| `samplePathCount`       | Integer, 100–2,000. Default `500`.                                     |
 
 ### Response
 
