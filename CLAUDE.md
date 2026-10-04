@@ -16,7 +16,7 @@ Keep these API capabilities available: `configure`, `simulate`, `suitability`, `
 
 ## Architecture and scope
 
-Approved stack: React + TypeScript and Node.js + TypeScript. Firebase SQL Connect (PostgreSQL) is the only database; there is no fallback database (approved 2026-10-04). Do not introduce Kafka, Redis, microservices, Kubernetes, GraphQL, event sourcing, CQRS, an API gateway, or another database without approval.
+Approved stack: React + TypeScript and Node.js + TypeScript. Supabase (PostgreSQL) is the only database; there is no fallback database (approved 2026-10-04). Do not introduce Kafka, Redis, microservices, Kubernetes, GraphQL, event sourcing, CQRS, an API gateway, or another database without approval.
 
 Products are ELN, DCD, and CPN for an RM user. Do not add login, admin roles, CRM, trading, pricing, tax, fees, early-redemption pricing, or additional products.
 
@@ -31,12 +31,12 @@ Products are ELN, DCD, and CPN for an RM user. Do not add login, admin roles, CR
 
 ## Database architecture
 
-Business logic must not call Firebase SDKs directly.
+Business logic must not call the Supabase SDK directly.
 
 ```text
-Controller → Service → Repository interface → Firebase SQL Connect adapter
+Controller → Service → Repository interface → Supabase adapter
 ```
 
-Keep the Firebase implementation isolated in its adapter (`apps/api/src/repositories/firebase`). There is no failover: if Firebase SQL Connect is unavailable, persistence fails with a clear error instead of writing anywhere else. The schema is `dataconnect/schema/schema.gql`; see `DATABASE_SCHEMA.md`.
+Keep the Supabase implementation isolated in its adapter (`apps/api/src/repositories/supabase`). The service-role key is server-only and never reaches the frontend. There is no failover: if Supabase is unavailable, persistence fails with a clear error instead of writing anywhere else. The schema is the SQL migrations in `supabase/migrations/`; see `DATABASE_SCHEMA.md`.
 
 Do not dual-write, replicate, or synchronize to any other store. Replacing the provider, adding a provider or a fallback, changing the repository abstraction or schema architecture, or introducing dual-write, replication, or Kafka requires explicit approval.

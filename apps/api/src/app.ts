@@ -6,8 +6,8 @@ import { createApiRouter, type ApiDeps } from './routes/index.js';
 import { createForecastClient, type ForecastClient } from './services/ai/forecastClient.js';
 import { createRagClient, type RagClient } from './services/ai/ragClient.js';
 import type { Repositories } from './repositories/interfaces/index.js';
-import { createDataConnectRunner } from './repositories/firebase/dataConnectRunner.js';
-import { createFirebaseRepositories } from './repositories/firebase/firebaseRepositories.js';
+import { createSupabaseClient } from './repositories/supabase/supabaseClient.js';
+import { createSupabaseRepositories } from './repositories/supabase/supabaseRepositories.js';
 import {
   createYahooHistoryProvider,
   type HistoryProvider,
@@ -32,10 +32,10 @@ function ragClientFromConfig(config: AppConfig): RagClient | undefined {
   return baseUrl ? createRagClient({ baseUrl, apiKey, timeoutMs }) : undefined;
 }
 
-/** Firebase SQL Connect repositories, or `undefined` when the database is not configured. */
+/** Supabase repositories, or `undefined` when the database is not configured. */
 function repositoriesFromConfig(config: AppConfig): Repositories | undefined {
   return config.database.configured
-    ? createFirebaseRepositories(createDataConnectRunner(config.database))
+    ? createSupabaseRepositories(createSupabaseClient(config.database))
     : undefined;
 }
 

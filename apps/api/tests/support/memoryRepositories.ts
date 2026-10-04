@@ -1,5 +1,5 @@
 // Test-only in-memory implementation of the repository interfaces. It exists to prove the
-// contract suite and to back service tests; production uses the Firebase SQL Connect adapter.
+// contract suite and to back service tests; production uses the Supabase adapter.
 /* eslint-disable @typescript-eslint/require-await --
    Methods stay async so that thrown RepositoryErrors become rejected promises, exactly like the real adapter. */
 import { randomUUID } from 'node:crypto';

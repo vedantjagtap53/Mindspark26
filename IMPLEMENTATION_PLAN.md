@@ -8,7 +8,7 @@ How we build the full RM workflow from `PRD.md` v2.0.
 | -------- | ----------------- | ------------------------------------------------------------ |
 | Frontend | This repo         | `apps/web`                                                   |
 | Backend  | This repo         | `apps/api`                                                   |
-| Database | This repo         | `dataconnect/` (Firebase SQL Connect)                        |
+| Database | This repo         | `supabase/` (Supabase, SQL migrations)                       |
 | ML / AI  | Karan, separately | Own service. This repo only calls its endpoints (section 4). |
 
 **The flow we are building**
@@ -106,7 +106,7 @@ Needs your approval before adding (not in `API_SPEC.md` yet):
 | `NOT_FOUND`           | 404  | Unknown simulation or profile id |
 | `AI_UNAVAILABLE`      | 503  | ML service down or timed out     |
 | `AI_INVALID_RESPONSE` | 502  | ML response broke the contract   |
-| `DATABASE_ERROR`      | 500  | Both databases failed            |
+| `DATABASE_ERROR`      | 500  | The database failed              |
 
 ### Build steps
 
@@ -127,10 +127,10 @@ Needs your approval before adding (not in `API_SPEC.md` yet):
 
 ## 3. Database
 
-Firebase SQL Connect is the only database (Supabase removed 2026-10-04). Code talks to repository interfaces, never to the SDK directly.
+Supabase is the only database (approved 2026-10-04). Code talks to repository interfaces, never to the SDK directly.
 
 ```text
-Controller → Service → Repository interface → Firebase SQL Connect adapter
+Controller → Service → Repository interface → Supabase adapter
 ```
 
 ### Tables
@@ -148,11 +148,11 @@ Controller → Service → Repository interface → Firebase SQL Connect adapter
 
 ### Build steps
 
-1. [x] Typed schema in `dataconnect/schema/schema.gql` (final columns in `DATABASE_SCHEMA.md`, which supersedes the table above).
-2. [x] Connectors (queries and mutations); no delete operations. Verified on the SQL Connect emulator.
+1. [x] SQL migration in `supabase/migrations/` (final columns in `DATABASE_SCHEMA.md`, which supersedes the table above).
+2. [x] `record_simulation` function for the atomic simulation write; audit tables append-only by trigger; RLS on with no policies.
 3. [x] Repository interfaces in `src/repositories/interfaces`, with a shared contract test suite (`tests/contract/repositoryContract.ts`).
-4. [x] Firebase SQL Connect adapter (`src/repositories/firebase`). Database unavailable → `DATABASE_ERROR`; not configured → `DATABASE_NOT_CONFIGURED`. No fallback.
-5. [x] Adapter tests against the SQL Connect emulator (contract suite 24/24).
+4. [x] Supabase adapter (`src/repositories/supabase`). Database unavailable → `DATABASE_ERROR`; not configured → `DATABASE_NOT_CONFIGURED`. No fallback.
+5. [x] Adapter tests against a local database (`tests/supabase`: contract suite, append-only check, app flow).
 
 ---
 
@@ -199,7 +199,7 @@ This repo only calls these. Base URL `AI_API_URL`, header `Authorization: Bearer
 | Week | Frontend                                 | Backend                                             | Database                                | ML (Karan)                                                  |
 | ---- | ---------------------------------------- | --------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------- |
 | 1    | Layout, dashboard, product forms         | Decisions (§0), server setup, schemas, `/configure` | Schema + migration                      | `/forecast` model and simulation                            |
-| 2    | Client profile, mode picker              | Payoff + risk engines, Mode B                       | Repository interfaces, Firebase adapter | `/forecast` backtest, caching, share a real sample response |
+| 2    | Client profile, mode picker              | Payoff + risk engines, Mode B                       | Repository interfaces, Supabase adapter | `/forecast` backtest, caching, share a real sample response |
 | 3    | Results page: charts, risk panel         | Mode A, suitability, market data                    | Connectors, adapter tests               | `/explain` with RAG                                         |
 | 4    | Fan chart, model card, explanation, chat | `/explain`, `/chat`, integration tests              | Persistence tests                       | `/chat` + guardrails                                        |
 | 5    | End-to-end tests, polish                 | Bug fixes, security check                           | —                                       | Support end-to-end tests                                    |

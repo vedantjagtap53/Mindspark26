@@ -54,7 +54,7 @@ export interface SuitabilityResponse {
   productRiskRating: 'Low' | 'High';
   /**
    * Whether the simulation, verdict and profile snapshot were written to the database. `false`
-   * only when Firebase SQL Connect is not configured (development and tests); a configured
+   * only when Supabase is not configured (development and tests); a configured
    * database that fails returns DATABASE_ERROR instead.
    */
   persisted: boolean;

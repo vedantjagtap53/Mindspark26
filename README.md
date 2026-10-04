@@ -6,12 +6,12 @@ A suitability-aware simulator for ELN, DCD, and CPN structured products, used by
 
 - React + TypeScript frontend
 - Node.js + TypeScript API
-- Firebase SQL Connect (PostgreSQL) database
+- Supabase (PostgreSQL) database
 - External AI/ML integration for forecasts, explanations, and chat
 
 ## Getting started
 
-Needs Node.js 20.19+ and Python 3.11+.
+Needs Node.js 22+ and Python 3.11+.
 
 ```sh
 npm run setup          # .env files, npm install, a .venv per Python service
@@ -28,11 +28,11 @@ npm run dev:rag        # explain/chat service, http://127.0.0.1:8001
 
 The explanation and chat need a Google Gemini key: put it in `services/rag/.env` as `GOOGLE_API_KEY`, then build the knowledge-base index once with `npm run rag:index` (again after editing `services/rag/rag/knowledge/`).
 
-`setup` generates the key shared by the API and the forecast service. Optional: `UPSTOX_ACCESS_TOKEN` in `.env` for live Nifty 50 levels (otherwise type the level), Firebase settings for persistence.
+`setup` generates the key shared by the API and the forecast service. Optional: `UPSTOX_ACCESS_TOKEN` in `.env` for live Nifty 50 levels (otherwise type the level), `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` for persistence (apply the schema first; see `DATABASE_SCHEMA.md`).
 
 Checks: `npm run typecheck`, `npm run lint`, `npm test`; Python tests run with each service's `.venv` (`.venv/Scripts/python -m pytest` on Windows, `.venv/bin/python -m pytest` elsewhere).
 
-Browser tests: `npm run test:e2e` (Playwright; starts test-only stubs for the forecast, explanation and price-history services, the API and the web app). If Playwright cannot download its browser, point it at a local Chromium with `PLAYWRIGHT_CHROMIUM_PATH`. Set `DATA_CONNECT_EMULATOR_HOST` to include the saved-profile tests against the SQL Connect emulator (see `DATABASE_SCHEMA.md`).
+Browser tests: `npm run test:e2e` (Playwright; starts test-only stubs for the forecast, explanation and price-history services, the API and the web app). If Playwright cannot download its browser, point it at a local Chromium with `PLAYWRIGHT_CHROMIUM_PATH`. Set `SUPABASE_TEST_URL` and `SUPABASE_TEST_SERVICE_ROLE_KEY` to include the saved-profile tests against a local Supabase (see `DATABASE_SCHEMA.md`).
 
 Open decisions and the credentials still needed: `docs/decisions/2026-10-04-open-decisions.md`.
 
@@ -44,7 +44,7 @@ apps/api          Express API: routes → controllers → services → engines /
 packages/shared   Zod schemas, types and constants used by both
 services/forecast Mode A forecast service (Python, owned by the AI/ML developer)
 services/rag      Explanation and chat service (Python, owned by the AI/ML developer)
-dataconnect       Firebase SQL Connect schema and connectors
+supabase          Supabase CLI config and SQL migrations (the database schema)
 docs              Formulas, rules, contracts; docs/design holds the archived UI prototype (zip)
 scripts           setup and dev-service helpers
 ```

@@ -1,6 +1,6 @@
 // Writes the audit record of a simulation (PRD §7.2 "Session and record keeping") through the
-// repository interfaces. Business logic never sees the Firebase SDK. There is no fallback store:
-// when Firebase SQL Connect is configured and a write fails, the request fails with a clear error;
+// repository interfaces. Business logic never sees the Supabase SDK. There is no fallback store:
+// when Supabase is configured and a write fails, the request fails with a clear error;
 // when it is not configured (development, tests) nothing is persisted and the caller is told so.
 //
 // A simulation row is immutable and links the profile used, so the whole record (configuration,

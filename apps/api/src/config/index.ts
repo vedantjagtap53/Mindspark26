@@ -1,20 +1,16 @@
 // Centralized, typed application configuration. Everything else receives an AppConfig;
 // nothing outside src/config reads process.env.
 import type { RuntimeEnvironment } from '@mindspark/shared';
-import { FIREBASE_REQUIRED, parseEnv, type Env } from './env.js';
+import { SUPABASE_REQUIRED, parseEnv, type Env } from './env.js';
 
 export interface AppConfig {
   env: RuntimeEnvironment;
   port: number;
-  /** Firebase SQL Connect, the only database. Credentials are read only by its adapter. */
+  /** Supabase, the only database. The key is read only by its adapter. */
   database: {
     configured: boolean;
-    projectId?: string;
-    serviceId?: string;
-    location?: string;
-    clientEmail?: string;
-    privateKey?: string;
-    emulatorHost?: string;
+    url?: string;
+    serviceRoleKey?: string;
   };
   ai: {
     baseUrl?: string;
@@ -41,13 +37,9 @@ export function buildConfig(env: Env): AppConfig {
     env: env.NODE_ENV,
     port: env.API_PORT,
     database: {
-      configured: FIREBASE_REQUIRED.every((name) => Boolean(env[name])),
-      projectId: env.FIREBASE_PROJECT_ID,
-      serviceId: env.FIREBASE_SQL_CONNECT_SERVICE_ID,
-      location: env.FIREBASE_SQL_CONNECT_LOCATION,
-      clientEmail: env.FIREBASE_CLIENT_EMAIL,
-      privateKey: env.FIREBASE_PRIVATE_KEY,
-      emulatorHost: env.DATA_CONNECT_EMULATOR_HOST,
+      configured: SUPABASE_REQUIRED.every((name) => Boolean(env[name])),
+      url: env.SUPABASE_URL,
+      serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
     },
     ai: {
       baseUrl: env.AI_API_URL,

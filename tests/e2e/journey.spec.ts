@@ -66,7 +66,7 @@ test('DCD Mode A: FX forecast through the DCD engine', async ({ page }) => {
 });
 
 test.describe('saved client profiles', () => {
-  test.skip(!process.env.DATA_CONNECT_EMULATOR_HOST, 'needs the SQL Connect emulator');
+  test.skip(!process.env.SUPABASE_TEST_URL, 'needs a local Supabase');
 
   test('save, load and link a profile to the recorded verdict', async ({ page }) => {
     const ref = `E2E-${Date.now()}`;
@@ -91,7 +91,7 @@ test.describe('saved client profiles', () => {
 });
 
 test('saved profiles report a missing database clearly', async ({ page }) => {
-  test.skip(!!process.env.DATA_CONNECT_EMULATOR_HOST, 'database is configured');
+  test.skip(!!process.env.SUPABASE_TEST_URL, 'database is configured');
   await page.goto('/');
   await expect(
     page.getByText(/Saved profiles unavailable \(DATABASE_NOT_CONFIGURED\)/),

@@ -14,10 +14,10 @@ describe('parseEnv', () => {
   });
 
   it('treats empty strings (as shipped in .env.example) as unset', () => {
-    const env = parseEnv({ API_PORT: '', FIREBASE_PROJECT_ID: '', AI_API_URL: '', NODE_ENV: '' });
+    const env = parseEnv({ API_PORT: '', SUPABASE_URL: '', AI_API_URL: '', NODE_ENV: '' });
     expect(env.API_PORT).toBe(4000);
     expect(env.NODE_ENV).toBe('development');
-    expect(env.FIREBASE_PROJECT_ID).toBeUndefined();
+    expect(env.SUPABASE_URL).toBeUndefined();
     expect(env.AI_API_URL).toBeUndefined();
   });
 
@@ -36,42 +36,40 @@ describe('parseEnv', () => {
     expect(() => parseEnv(source)).toThrow(variable);
   });
 
-  it('requires Firebase service-account credentials as a pair', () => {
-    expect(() => parseEnv({ FIREBASE_CLIENT_EMAIL: 'a@b.c' })).toThrow(/set together/);
-    expect(() => parseEnv({ FIREBASE_PRIVATE_KEY: 'k' })).toThrow(/set together/);
+  it('requires the Supabase URL and service-role key as a pair', () => {
+    expect(() => parseEnv({ SUPABASE_URL: 'https://x.supabase.co' })).toThrow(/set together/);
+    expect(() => parseEnv({ SUPABASE_SERVICE_ROLE_KEY: 'k' })).toThrow(/set together/);
   });
 
-  it('requires the Firebase SQL Connect project, service and location in production', () => {
-    for (const name of [
-      'FIREBASE_PROJECT_ID',
-      'FIREBASE_SQL_CONNECT_SERVICE_ID',
-      'FIREBASE_SQL_CONNECT_LOCATION',
-    ]) {
+  it('rejects a Supabase URL that is not a URL', () => {
+    expect(() => parseEnv({ SUPABASE_URL: 'nope', SUPABASE_SERVICE_ROLE_KEY: 'k' })).toThrow(
+      'SUPABASE_URL',
+    );
+  });
+
+  it('rejects a Supabase URL with a path such as /rest/v1', () => {
+    const key = { SUPABASE_SERVICE_ROLE_KEY: 'k' };
+    expect(() => parseEnv({ ...key, SUPABASE_URL: 'https://x.supabase.co/rest/v1/' })).toThrow(
+      /SUPABASE_URL: must be the project URL without a path/,
+    );
+    expect(parseEnv({ ...key, SUPABASE_URL: 'https://x.supabase.co/' }).SUPABASE_URL).toBe(
+      'https://x.supabase.co/',
+    );
+  });
+
+  it('requires the Supabase URL and service-role key in production', () => {
+    for (const name of ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']) {
       expect(() => parseEnv({ NODE_ENV: 'production' })).toThrow(
         `${name} is required in production`,
       );
     }
-    expect(() =>
-      parseEnv({
-        NODE_ENV: 'production',
-        FIREBASE_PROJECT_ID: 'p',
-        FIREBASE_SQL_CONNECT_LOCATION: 'x',
-      }),
-    ).toThrow(/FIREBASE_SQL_CONNECT_SERVICE_ID/);
     expect(
       parseEnv({
         NODE_ENV: 'production',
-        FIREBASE_PROJECT_ID: 'proj',
-        FIREBASE_SQL_CONNECT_SERVICE_ID: 'svc',
-        FIREBASE_SQL_CONNECT_LOCATION: 'asia-south1',
+        SUPABASE_URL: 'https://x.supabase.co',
+        SUPABASE_SERVICE_ROLE_KEY: 'k',
       }).NODE_ENV,
     ).toBe('production');
-  });
-
-  it('ignores Supabase variables left over from older .env files', () => {
-    const env = parseEnv({ SUPABASE_URL: 'https://x.supabase.co', DATABASE_PRIMARY: 'supabase' });
-    expect(env).not.toHaveProperty('SUPABASE_URL');
-    expect(env).not.toHaveProperty('DATABASE_PRIMARY');
   });
 
   it('does not require database configuration outside production', () => {
@@ -82,7 +80,7 @@ describe('parseEnv', () => {
   it('never echoes secret values in error messages', () => {
     const secret = 'super-secret-private-key';
     try {
-      parseEnv({ FIREBASE_PRIVATE_KEY: secret, API_PORT: 'nope' });
+      parseEnv({ SUPABASE_SERVICE_ROLE_KEY: secret, API_PORT: 'nope' });
       expect.unreachable();
     } catch (err) {
       expect(err).toBeInstanceOf(ConfigError);
@@ -105,20 +103,16 @@ describe('loadConfig', () => {
     const config = loadConfig({
       NODE_ENV: 'production',
       API_PORT: '5000',
-      FIREBASE_PROJECT_ID: 'proj',
-      FIREBASE_SQL_CONNECT_SERVICE_ID: 'svc',
-      FIREBASE_SQL_CONNECT_LOCATION: 'asia-south1',
-      DATA_CONNECT_EMULATOR_HOST: '127.0.0.1:9399',
+      SUPABASE_URL: 'https://x.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY: 'k',
       AI_API_URL: 'https://ai.example',
     });
     expect(config.env).toBe('production');
     expect(config.port).toBe(5000);
-    expect(config.database).toMatchObject({
+    expect(config.database).toEqual({
       configured: true,
-      projectId: 'proj',
-      serviceId: 'svc',
-      location: 'asia-south1',
-      emulatorHost: '127.0.0.1:9399',
+      url: 'https://x.supabase.co',
+      serviceRoleKey: 'k',
     });
     expect(config.ai.baseUrl).toBe('https://ai.example');
   });

@@ -4,14 +4,14 @@ Review done while completing the MVP. `PRD.md` is the source of truth. Nothing b
 
 ## Credentials and deployment needed
 
-| Item                     | What is needed                                                                                                                                                                                                                                                                                   | Where it goes                                                                                                                     |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| Firebase SQL Connect     | A Firebase project with SQL Connect and a Cloud SQL (PostgreSQL) instance; the real `serviceId`, `location`, instance id and database name (the current values in `dataconnect/dataconnect.yaml` are placeholders); then `firebase deploy --only dataconnect` to apply the schema and connector. | `dataconnect/dataconnect.yaml`; `.env`: `FIREBASE_PROJECT_ID`, `FIREBASE_SQL_CONNECT_SERVICE_ID`, `FIREBASE_SQL_CONNECT_LOCATION` |
-| API database credentials | A service account allowed to execute SQL Connect operations (or Application Default Credentials on the host).                                                                                                                                                                                    | `.env`: `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`                                                                           |
-| Explanation and chat     | `GOOGLE_API_KEY` for the RAG service (not yet tested with a real key).                                                                                                                                                                                                                           | `services/rag/.env`                                                                                                               |
-| Live level (optional)    | `FINNHUB_API_KEY` (US stocks/crypto only) or `UPSTOX_ACCESS_TOKEN` (Nifty 50). The RM can always type the level.                                                                                                                                                                                 | `.env`                                                                                                                            |
+| Item                     | What is needed                                                                                                               | Where it goes                                       |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Supabase                 | A Supabase project; then `npx supabase link --project-ref <ref>` and `npx supabase db push` to apply `supabase/migrations/`. | —                                                   |
+| API database credentials | The project URL and its service-role (or `sb_secret_…`) key, on the API host only.                                           | `.env`: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
+| Explanation and chat     | `GOOGLE_API_KEY` for the RAG service (not yet tested with a real key).                                                       | `services/rag/.env`                                 |
+| Live level (optional)    | `FINNHUB_API_KEY` (US stocks/crypto only) or `UPSTOX_ACCESS_TOKEN` (Nifty 50). The RM can always type the level.             | `.env`                                              |
 
-The persistence code is verified against the SQL Connect emulator (contract suite, app-level flow and browser test); only the cloud deployment is missing.
+The database moved from Firebase SQL Connect to Supabase on 2026-10-04 (approved by Karan). See `IMPLEMENTATION_STATUS.md` for how far the Supabase adapter has been verified; only the hosted project is missing.
 
 ## Decisions needed
 
@@ -54,4 +54,4 @@ The persistence code is verified against the SQL Connect emulator (contract suit
    - The ad hoc (unsaved) profile snapshot is stored with `clientRef: "unsaved"`.
    - A database outage returns `DATABASE_ERROR` with HTTP 500 (the existing mapping); 503 may suit an outage better.
    - Root `Frontend/` and `ML/` look like pre-workspace copies of `apps/web` and `services/forecast`. They are now excluded from lint; delete them if no longer needed.
-   - `npm audit`: 2 moderate issues via firebase-admin (unchanged).
+   - `npm audit`: clean since the database SDK change (the 2 moderate issues came from the removed Firebase SDK).

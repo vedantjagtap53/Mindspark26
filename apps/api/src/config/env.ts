@@ -15,27 +15,23 @@ const emptyToUndefined = (v: unknown) => (typeof v === 'string' && v.trim() === 
 const unsetIfEmpty = <T extends z.ZodType>(schema: T) => z.preprocess(emptyToUndefined, schema);
 const optional = <T extends z.ZodType>(schema: T) => unsetIfEmpty(schema.optional());
 
-/** Firebase SQL Connect settings that must all be present for the database to be usable. */
-export const FIREBASE_REQUIRED = [
-  'FIREBASE_PROJECT_ID',
-  'FIREBASE_SQL_CONNECT_SERVICE_ID',
-  'FIREBASE_SQL_CONNECT_LOCATION',
-] as const;
+/** Supabase settings that must all be present for the database to be usable. */
+export const SUPABASE_REQUIRED = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'] as const;
 
 const envSchema = z
   .object({
     NODE_ENV: unsetIfEmpty(z.enum(['development', 'test', 'production']).default('development')),
     API_PORT: unsetIfEmpty(z.coerce.number().int().min(1).max(65535).default(4000)),
 
-    // Firebase SQL Connect, the only database. Service-account credentials are optional
-    // (Application Default Credentials are used when both are empty).
-    FIREBASE_PROJECT_ID: optional(z.string()),
-    FIREBASE_SQL_CONNECT_SERVICE_ID: optional(z.string()),
-    FIREBASE_SQL_CONNECT_LOCATION: optional(z.string()),
-    FIREBASE_CLIENT_EMAIL: optional(z.string()),
-    FIREBASE_PRIVATE_KEY: optional(z.string()),
-    // Local SQL Connect emulator, e.g. 127.0.0.1:9399.
-    DATA_CONNECT_EMULATOR_HOST: optional(z.string()),
+    // Supabase, the only database. The service-role (or sb_secret_…) key is server-only and is
+    // read by the database adapter alone.
+    // Bare project URL: supabase-js adds /rest/v1 itself.
+    SUPABASE_URL: optional(
+      z.url().refine((u) => !URL.canParse(u) || new URL(u).pathname.replace(/\/+$/, '') === '', {
+        message: 'must be the project URL without a path (e.g. https://<ref>.supabase.co)',
+      }),
+    ),
+    SUPABASE_SERVICE_ROLE_KEY: optional(z.string()),
 
     AI_API_URL: optional(z.url()),
     AI_API_KEY: optional(z.string()),
@@ -68,16 +64,16 @@ const envSchema = z
     MARKET_HISTORY_API_URL: unsetIfEmpty(z.url().default('https://query1.finance.yahoo.com')),
   })
   .superRefine((env, ctx) => {
-    if (!env.FIREBASE_CLIENT_EMAIL !== !env.FIREBASE_PRIVATE_KEY) {
+    if (!env.SUPABASE_URL !== !env.SUPABASE_SERVICE_ROLE_KEY) {
       ctx.addIssue({
         code: 'custom',
-        path: ['FIREBASE_CLIENT_EMAIL'],
+        path: ['SUPABASE_URL'],
         message:
-          'FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY must be set together (or both left empty)',
+          'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set together (or both left empty)',
       });
     }
     if (env.NODE_ENV === 'production') {
-      for (const name of FIREBASE_REQUIRED) {
+      for (const name of SUPABASE_REQUIRED) {
         if (!env[name]) {
           ctx.addIssue({
             code: 'custom',

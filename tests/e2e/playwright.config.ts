@@ -1,14 +1,16 @@
 // Browser end-to-end tests (tests/e2e): the real web app and API, with the external forecast,
 // explanation and price-history services replaced by test-only stubs (tests/e2e/support).
-// Saved-profile persistence runs against the SQL Connect emulator when DATA_CONNECT_EMULATOR_HOST
-// is set (see DATABASE_SCHEMA.md); otherwise the API runs with no database.
+// Saved-profile persistence runs against a local Supabase when SUPABASE_TEST_URL and
+// SUPABASE_TEST_SERVICE_ROLE_KEY are set (see DATABASE_SCHEMA.md); otherwise the API runs with no
+// database.
 import { resolve } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 
 const STUB = 4911;
 const API = 4100;
 const WEB = 3100;
-const emulator = process.env.DATA_CONNECT_EMULATOR_HOST;
+const supabaseUrl = process.env.SUPABASE_TEST_URL ?? '';
+const supabaseKey = supabaseUrl ? (process.env.SUPABASE_TEST_SERVICE_ROLE_KEY ?? '') : '';
 // Servers start from the repository root.
 const root = resolve(import.meta.dirname, '../..');
 
@@ -23,14 +25,8 @@ const apiEnv: Record<string, string> = {
   MARKET_HISTORY_API_URL: `http://127.0.0.1:${STUB}/yahoo`,
   FINNHUB_API_KEY: '',
   UPSTOX_ACCESS_TOKEN: '',
-  FIREBASE_PROJECT_ID: emulator ? 'demo-mindspark' : '',
-  FIREBASE_SQL_CONNECT_SERVICE_ID: emulator
-    ? (process.env.FDC_TEST_SERVICE_ID ?? 'finstruct-service')
-    : '',
-  FIREBASE_SQL_CONNECT_LOCATION: emulator
-    ? (process.env.FDC_TEST_LOCATION ?? 'asia-southeast1')
-    : '',
-  DATA_CONNECT_EMULATOR_HOST: emulator ?? '',
+  SUPABASE_URL: supabaseUrl,
+  SUPABASE_SERVICE_ROLE_KEY: supabaseKey,
 };
 
 export default defineConfig({

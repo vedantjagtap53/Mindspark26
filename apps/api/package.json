@@ -13,8 +13,8 @@
   },
   "dependencies": {
     "@mindspark/shared": "0.1.0",
+    "@supabase/supabase-js": "^2.117.2",
     "express": "^5.2.1",
-    "firebase-admin": "^14.5.0",
     "protobufjs": "^7.6.6",
     "ws": "^8.22.0",
     "zod": "^4.6.5"
@@ -22,9 +22,11 @@
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^24.19.1",
+    "@types/pg": "^8.23.1",
     "@types/supertest": "^6.0.3",
     "@types/ws": "^8.18.2",
     "esbuild": "^0.28.2",
+    "pg": "^8.23.1",
     "supertest": "^7.3.1",
     "tsx": "^4.23.15"
   }

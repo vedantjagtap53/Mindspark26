@@ -16,7 +16,7 @@ describe('GET /api/health', () => {
     expect(res.body).toMatchObject({
       status: 'ok',
       environment: 'test',
-      database: { provider: 'firebase-sql-connect', configured: false },
+      database: { provider: 'supabase', configured: false },
     });
     expect(new Date(healthBody(res).timestamp).toString()).not.toBe('Invalid Date');
     expect(healthBody(res).uptimeSeconds).toBeGreaterThanOrEqual(0);
@@ -26,42 +26,27 @@ describe('GET /api/health', () => {
     const res = await request(
       app({
         NODE_ENV: 'production',
-        FIREBASE_PROJECT_ID: 'proj',
-        FIREBASE_SQL_CONNECT_SERVICE_ID: 'svc',
-        FIREBASE_SQL_CONNECT_LOCATION: 'asia-south1',
+        SUPABASE_URL: 'https://proj.supabase.co',
+        SUPABASE_SERVICE_ROLE_KEY: 'k',
       }),
     ).get('/api/health');
     expect(healthBody(res).environment).toBe('production');
-    expect(healthBody(res).database).toEqual({
-      provider: 'firebase-sql-connect',
-      configured: true,
-    });
-  });
-
-  it('reports Firebase as not configured when the SQL Connect service is missing', async () => {
-    const res = await request(app({ FIREBASE_PROJECT_ID: 'proj' })).get('/api/health');
-    expect(healthBody(res).database.configured).toBe(false);
+    expect(healthBody(res).database).toEqual({ provider: 'supabase', configured: true });
   });
 
   it('does not expose secrets or credential values', async () => {
     const res = await request(
       app({
-        FIREBASE_PROJECT_ID: 'proj-id-visible-only-as-flag',
-        FIREBASE_CLIENT_EMAIL: 'svc@proj.iam.gserviceaccount.com',
-        FIREBASE_PRIVATE_KEY: 'PRIVATE-KEY-VALUE',
-        FIREBASE_SQL_CONNECT_SERVICE_ID: 'secret-service',
-        DATA_CONNECT_EMULATOR_HOST: 'secret-host:9399',
+        SUPABASE_URL: 'https://secret-project-ref.supabase.co',
+        SUPABASE_SERVICE_ROLE_KEY: 'SERVICE-ROLE-KEY-VALUE',
         AI_API_KEY: 'AI-KEY-VALUE',
         MARKET_DATA_API_KEY: 'MD-KEY-VALUE',
       }),
     ).get('/api/health');
     const text = JSON.stringify(res.body);
     for (const secret of [
-      'proj-id-visible-only-as-flag',
-      'svc@proj',
-      'PRIVATE-KEY-VALUE',
-      'secret-host',
-      'secret-service',
+      'secret-project-ref',
+      'SERVICE-ROLE-KEY-VALUE',
       'AI-KEY-VALUE',
       'MD-KEY-VALUE',
     ]) {

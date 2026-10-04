@@ -35,7 +35,7 @@ export interface ApiDeps {
   rag?: RagClient;
   /** Daily closes for the Mode A fan chart; absent when MARKET_HISTORY_PROVIDER is none. */
   history?: HistoryProvider;
-  /** Firebase SQL Connect repositories; absent when the database is not configured. */
+  /** Supabase repositories; absent when the database is not configured. */
   repositories?: Repositories;
 }
 

@@ -1,6 +1,6 @@
 // Simulation runs kept in API memory so /api/suitability, /api/explain and /api/chat can work from
 // the backend's own numbers (the browser never sends results back). Approved by Karan 2026-10-04
-// as the interim until Firebase SQL Connect persistence is wired; records are lost on restart.
+// as the interim until database persistence was wired; records are lost on restart.
 // This is working state for a session, not a database: nothing is written anywhere else.
 
 import type {

@@ -7,7 +7,7 @@ React frontend → REST/JSON Node.js TypeScript API
                          ├─ validation and market data
                          ├─ AI API integration (external ownership)
                          └─ simulation → payoff → risk → suitability → repository interface
-                                                                         └─ Firebase SQL Connect adapter → Firebase SQL Connect (PostgreSQL)
+                                                                         └─ Supabase adapter → Supabase (PostgreSQL)
 ```
 
 Mode A receives AI forecast output, then runs the same payoff, risk, and suitability pipeline as Mode B. Mode B starts with live market data plus a manual shock. AI does not determine payoff, risk, or suitability.
@@ -16,4 +16,4 @@ Mode A detail: `services/ai/forecastClient.ts` calls the external forecast servi
 
 The external AI boundary covers forecasting, RAG, explanation, and chat. This project validates and consumes its output only.
 
-The Firebase SQL Connect adapter is the only layer allowed to depend on Firebase SDKs. Firebase SQL Connect is the only database (Supabase removed 2026-10-04): there is no fallback or failover, and no replication or dual-write. If the database is unavailable, persistence fails with a clear error.
+The Supabase adapter (`apps/api/src/repositories/supabase`) is the only layer allowed to depend on the Supabase SDK. Supabase is the only database (approved 2026-10-04): there is no fallback or failover, and no replication or dual-write. If the database is unavailable, persistence fails with a clear error. The API uses the server-only service-role key; row-level security is on with no policies, and the schema rejects updates and deletes of audit records.

@@ -33,8 +33,8 @@ export interface HealthResponse {
   timestamp: string;
   uptimeSeconds: number;
   database: {
-    provider: 'firebase-sql-connect';
-    /** Whether project, service and location are set. Not a connectivity check. */
+    provider: 'supabase';
+    /** Whether the Supabase URL and service-role key are set. Not a connectivity check. */
     configured: boolean;
   };
 }

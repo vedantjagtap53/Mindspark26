@@ -27,13 +27,13 @@ const toSaved = (r: ClientProfileRecord): SavedProfile => ({
 
 const notFound = () => new AppError('NOT_FOUND', 'Saved client profile not found');
 
-/** `repositories` is absent when Firebase SQL Connect is not configured: every call then says so. */
+/** `repositories` is absent when Supabase is not configured: every call then says so. */
 export function createClientProfileService(repositories?: Repositories): ClientProfileService {
   const repo = () => {
     if (!repositories) {
       throw new AppError(
         'DATABASE_NOT_CONFIGURED',
-        'Saved profiles need the database: set FIREBASE_PROJECT_ID, FIREBASE_SQL_CONNECT_SERVICE_ID and FIREBASE_SQL_CONNECT_LOCATION',
+        'Saved profiles need the database: set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY',
       );
     }
     return repositories.clientProfiles;

@@ -1,5 +1,5 @@
-// Behaviour every Repositories implementation must have. Run it against the in-memory
-// implementation now and against the Firebase SQL Connect adapter (emulator) when it exists.
+// Behaviour every Repositories implementation must have. Runs against the in-memory
+// implementation and against the Supabase adapter on a local database (tests/supabase).
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   RepositoryError,

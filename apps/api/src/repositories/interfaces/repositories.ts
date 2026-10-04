@@ -1,5 +1,5 @@
 // Repository interfaces: the only way services reach the database
-// (Controller → Service → Repository interface → Firebase SQL Connect adapter).
+// (Controller → Service → Repository interface → Supabase adapter).
 // Ids are canonical lowercase UUID strings. Failures throw RepositoryError.
 // There are deliberately no delete methods: simulations and their results are audit evidence.
 

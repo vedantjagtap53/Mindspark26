@@ -1,5 +1,5 @@
 // Persistence through the real app with the test-only in-memory repositories, and
-// /api/client-profiles. The Firebase adapter itself is covered by the contract suite on the emulator.
+// /api/client-profiles. The Supabase adapter itself is covered by the contract suite in tests/supabase.
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import type { SavedProfile, SuitabilityResponse } from '@mindspark/shared';
@@ -183,7 +183,7 @@ describe('persistence of simulation, verdict and explanation', () => {
   it('fails with DATABASE_ERROR instead of writing anywhere else when the database is down', async () => {
     const repos = createMemoryRepositories();
     repos.productConfigurations.create = () =>
-      Promise.reject(new RepositoryError('unavailable', 'Firebase SQL Connect is unreachable'));
+      Promise.reject(new RepositoryError('unavailable', 'Supabase is unreachable'));
     const app = appWith(repos);
     const simulationId = await simulate(app);
     const res = await request(app).post('/api/suitability').send({ simulationId, profile });

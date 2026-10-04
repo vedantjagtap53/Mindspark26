@@ -20,14 +20,10 @@ test-results/
 *.p12
 *.pfx
 serviceAccountKey.json
-*-firebase-adminsdk-*.json
 
-# Firebase local runtime output
-dataconnect/.dataconnect/
-.firebase/
-firebase-debug.log
-firestore-debug.log
-ui-debug.log
+# Supabase CLI local state (supabase/.gitignore covers it too)
+supabase/.temp/
+supabase/.branches/
 
 # Python virtual environments, bytecode, and test/tool caches
 .venv/

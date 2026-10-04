@@ -18,7 +18,7 @@ export function createHealthService(
         environment: config.env,
         timestamp: now().toISOString(),
         uptimeSeconds: Math.floor(uptime()),
-        database: { provider: 'firebase-sql-connect', configured: config.database.configured },
+        database: { provider: 'supabase', configured: config.database.configured },
       };
     },
   };
