@@ -63,10 +63,15 @@ export function payoffMarkers(run: SessionRun): ChartMarker[] {
   return [];
 }
 
-/** Strike and barrier guide lines in level terms for the fan chart (ELN, Mode A). */
+/** Strike and barrier guide lines in level terms for the fan chart (ELN and DCD, Mode A). */
 export function fanLines(run: SessionRun) {
   const spot = startLevelOf(run);
   const lines: Array<{ level: number; label: string; tone: 'strike' | 'barrier' }> = [];
+  if (run.product === 'DCD') {
+    const strike = num(run.terms, 'strikeRate');
+    if (strike !== null) lines.push({ level: strike, label: `Strike ${strike}`, tone: 'strike' });
+    return lines;
+  }
   if (run.product !== 'ELN') return lines;
   const strike = num(run.terms, 'strikePct');
   const barrier = num(run.terms, 'barrierPct');

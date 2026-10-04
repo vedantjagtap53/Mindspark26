@@ -4,6 +4,7 @@
 
 import type { ChatRequest, ChatResponse, ExplainResponse } from '@mindspark/shared';
 import { AppError } from '../../utils/errors.js';
+import type { PersistenceService } from '../persistence/persistenceService.js';
 import type { SimulationRecords } from '../simulation/simulationRecords.js';
 import type { RagClient } from './ragClient.js';
 import { buildRagContext } from './simulationContext.js';
@@ -15,6 +16,7 @@ export interface AdvisoryService {
 
 export interface AdvisoryDeps {
   records: SimulationRecords;
+  persistence: PersistenceService;
   /** Absent when RAG_API_URL is not configured. */
   rag?: RagClient;
 }
@@ -58,6 +60,21 @@ export function createAdvisoryService(deps: AdvisoryDeps): AdvisoryService {
         sources: out.sources,
         model: out.model_name,
       };
+      if (record.persistedSimulationId) {
+        const { sections } = response;
+        await deps.persistence.recordExplanation(record.persistedSimulationId, {
+          text: [
+            sections.whatItIs,
+            sections.bestCase,
+            sections.worstCase,
+            sections.lossTriggers,
+            sections.suitabilityReasoning,
+            response.riskNotice,
+          ].join('\n\n'),
+          model: response.model,
+          sources: response.sources,
+        });
+      }
       deps.records.update(simulationId, { explanation: response });
       return response;
     },

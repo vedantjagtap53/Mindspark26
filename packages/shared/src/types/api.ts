@@ -1,6 +1,7 @@
 export type ApiErrorCode =
   | 'VALIDATION_ERROR'
   | 'NOT_FOUND'
+  | 'CONFLICT'
   | 'PAYLOAD_TOO_LARGE'
   | 'NOT_IMPLEMENTED'
   | 'DATABASE_NOT_CONFIGURED'

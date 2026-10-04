@@ -8,10 +8,11 @@ import {
   PRODUCT_RISK_RATINGS,
   type CaseOutcome,
 } from '../../engines/suitability/suitability.js';
+import type { PersistenceService } from '../persistence/persistenceService.js';
 import type { SimulationRecord, SimulationRecords } from '../simulation/simulationRecords.js';
 
 export interface SuitabilityService {
-  assess(request: SuitabilityRequest): SuitabilityResponse;
+  assess(request: SuitabilityRequest): Promise<SuitabilityResponse>;
 }
 
 const shockLabel = (pct: number) => `${pct > 0 ? '+' : ''}${pct}% shock`;
@@ -59,10 +60,11 @@ export function lowAndBaseCases(record: SimulationRecord): { low: CaseOutcome; b
 
 export function createSuitabilityService(deps: {
   records: SimulationRecords;
+  persistence: PersistenceService;
   concentrationLimitPct: number;
 }): SuitabilityService {
   return {
-    assess({ simulationId, profile }) {
+    async assess({ simulationId, profile, profileId }) {
       const record = deps.records.get(simulationId);
       const { low, base } = lowAndBaseCases(record);
       const { verdict, flags } = assessSuitability({
@@ -79,9 +81,23 @@ export function createSuitabilityService(deps: {
         flags,
         lowCase: low,
         productRiskRating: PRODUCT_RISK_RATINGS[record.request.productType],
+        persisted: deps.persistence.enabled,
       };
+      // Written before the verdict is shown: a configured database that fails fails the request.
+      const ids = await deps.persistence.recordAssessment({
+        record,
+        profile,
+        profileId,
+        suitability: response,
+      });
       // A new profile invalidates any explanation written for the previous verdict.
-      deps.records.update(simulationId, { profile, suitability: response, explanation: undefined });
+      deps.records.update(simulationId, {
+        profile,
+        suitability: response,
+        explanation: undefined,
+        configurationId: ids?.configurationId ?? record.configurationId,
+        persistedSimulationId: ids?.simulationId,
+      });
       return response;
     },
   };

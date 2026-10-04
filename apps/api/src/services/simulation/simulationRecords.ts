@@ -24,6 +24,11 @@ export type SimulationRecord = SimulationRun & {
   profile?: ClientProfile;
   suitability?: SuitabilityResponse;
   explanation?: ExplainResponse;
+  /** Mode A forecast metadata for the audit record (no sample paths or fan, PRD §7.2). */
+  forecastMeta?: Record<string, unknown>;
+  /** Database ids once written (set by the first /api/suitability call; see persistenceService). */
+  configurationId?: string;
+  persistedSimulationId?: string;
 };
 
 export interface SimulationRecords {

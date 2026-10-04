@@ -73,6 +73,7 @@ export function OutcomesPage({ run }: { run: SessionRun | null }) {
             />
             <FanChart
               fan={r.fan}
+              history={r.history}
               asOf={r.spot.asOf}
               lines={fanLines(run)}
               cases={[

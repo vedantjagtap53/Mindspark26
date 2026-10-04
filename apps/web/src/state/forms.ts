@@ -38,8 +38,10 @@ export interface CpnForm {
   capPct: number;
 }
 
-/** Decided profile fields (DATABASE_SCHEMA.md). Kept in the browser until /api/client-profiles exists. */
+/** Decided profile fields (DATABASE_SCHEMA.md). Saved profiles live behind /api/client-profiles. */
 export interface ProfileForm {
+  /** Id of the saved profile these fields were loaded from or saved as; null for an ad hoc profile. */
+  profileId: string | null;
   clientRef: string;
   label: string;
   riskAppetite: RiskAppetite;
@@ -96,6 +98,7 @@ export const DEFAULT_FORMS: Forms = {
 };
 
 export const DEFAULT_PROFILE: ProfileForm = {
+  profileId: null,
   clientRef: '',
   label: '',
   riskAppetite: 'medium',
@@ -104,7 +107,7 @@ export const DEFAULT_PROFILE: ProfileForm = {
   concentrationPct: 15,
 };
 
-/** The profile fields the suitability rules use; the client reference and label stay in the browser. */
+/** The profile fields the suitability rules use (the reference and label are not sent to /suitability). */
 export const clientProfile = (p: ProfileForm) => ({
   riskAppetite: p.riskAppetite,
   horizonMonths: p.horizonMonths,
@@ -162,9 +165,6 @@ export const configureRequest = (product: ProductType, forms: Forms) => ({
 
 /** Why a run cannot be sent yet, or null when it can. The browser only checks for missing input. */
 export function runBlocker(product: ProductType, run: RunSettings): string | null {
-  if (run.mode === 'A' && product === 'DCD') {
-    return 'Mode A needs an FX forecast, which is not available yet. Use Mode B for DCD.';
-  }
   const missingLevel = run.manualLevel === null || !(run.manualLevel > 0);
   if (run.mode === 'B' && run.levelSource === 'manual' && missingLevel) {
     return product === 'DCD'
@@ -175,8 +175,7 @@ export function runBlocker(product: ProductType, run: RunSettings): string | nul
 }
 
 /**
- * Run settings that are valid after switching from `from` to `to`: DCD has no Mode A and uses the
- * FX reference rate instead of a live level; ELN/CPN have no reference rate. A typed level is
+ * Run settings that are valid after switching from `from` to `to`: DCD uses the FX reference rate instead of a live level; ELN/CPN have no reference rate. A typed level is
  * cleared when switching between an index and an FX rate, so it is never sent for the wrong one.
  */
 export function runSettingsFor(from: ProductType, to: ProductType, run: RunSettings): RunSettings {
@@ -185,7 +184,6 @@ export function runSettingsFor(from: ProductType, to: ProductType, run: RunSetti
     return {
       ...run,
       manualLevel,
-      mode: 'B',
       levelSource: run.levelSource === 'live' ? 'reference' : run.levelSource,
     };
   }
@@ -208,3 +206,28 @@ export function simulateRequest(product: ProductType, forms: Forms, run: RunSett
       : { source: run.levelSource };
   return { mode: 'B', productType: product, terms, shockPct: run.shockPct, level };
 }
+
+/** The body of POST/PUT /api/client-profiles. */
+export const savedProfileBody = (p: ProfileForm) => ({
+  ...clientProfile(p),
+  clientRef: p.clientRef.trim(),
+  label: p.label.trim() || null,
+});
+
+export const profileFromSaved = (s: {
+  id: string;
+  clientRef: string;
+  label: string | null;
+  riskAppetite: RiskAppetite;
+  horizonMonths: number;
+  lossTolerancePct: number;
+  concentrationPct: number;
+}): ProfileForm => ({
+  profileId: s.id,
+  clientRef: s.clientRef,
+  label: s.label ?? '',
+  riskAppetite: s.riskAppetite,
+  horizonMonths: s.horizonMonths,
+  lossTolerancePct: s.lossTolerancePct,
+  concentrationPct: s.concentrationPct,
+});

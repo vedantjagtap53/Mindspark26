@@ -32,6 +32,10 @@ The explanation and chat need a Google Gemini key: put it in `services/rag/.env`
 
 Checks: `npm run typecheck`, `npm run lint`, `npm test`; Python tests run with each service's `.venv` (`.venv/Scripts/python -m pytest` on Windows, `.venv/bin/python -m pytest` elsewhere).
 
+Browser tests: `npm run test:e2e` (Playwright; starts test-only stubs for the forecast, explanation and price-history services, the API and the web app). If Playwright cannot download its browser, point it at a local Chromium with `PLAYWRIGHT_CHROMIUM_PATH`. Set `DATA_CONNECT_EMULATOR_HOST` to include the saved-profile tests against the SQL Connect emulator (see `DATABASE_SCHEMA.md`).
+
+Open decisions and the credentials still needed: `docs/decisions/2026-10-04-open-decisions.md`.
+
 ## Layout
 
 ```text

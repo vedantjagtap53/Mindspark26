@@ -36,12 +36,11 @@ Inputs: product risk metrics from the payoff and risk engine, plus the client pr
 - Low case: Mode A, the P5 case path; **Mode B, the worst outcome among the scenario shocks (−25%, −10%, 0%, +15%) and the RM's own shock**. Base case: Mode A P50 path; Mode B the RM's shock.
 - Mode A probabilities of loss and knock-in are shown, not used by a rule.
 
-## Open questions (not specified by the PRD)
+## Open questions (reviewed 2026-10-04)
 
-- Which of the rules above are **hard** flags. The mapping is decided, but this classification is still open.
-- Whether this list is complete (the PRD calls them "example rules").
-- Allowed risk-appetite values (scale), and how they compare with the Low / High product ratings.
-- The concentration limit value (fixed, or per client?).
-- What counts as the "low case" in Mode B. (Mode A is resolved: the P5 case path, PRD §7.2.)
-- Whether Mode A probability of loss / knock-in should drive a rule, or only be displayed. The PRD currently displays them only.
-- Units for loss tolerance (% of notional?) and investment horizon.
+Resolved by the 2026-10-04 decisions above: hard-flag classification, risk-appetite scale and comparison, concentration limit (fixed 25%, configurable), Mode B low case, units, and Mode A probabilities (displayed only, PRD §7.1).
+
+Still open:
+
+- Whether this rule list is complete (the PRD calls them "example rules").
+- The RAG policy text (`services/rag/rag/knowledge/policy/suitability_policy.md`) is a DRAFT written from the PRD and must be replaced by the institution's policy before production. Gaps against the engine: it does not say which flags are hard (low-case loss; high-risk product for a low appetite), that a medium appetite gives Caution for ELN/DCD, the 25% concentration limit, or how the Mode B low case is chosen. See `docs/decisions/2026-10-04-open-decisions.md`.

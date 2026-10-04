@@ -5,6 +5,9 @@
 import { randomUUID } from 'node:crypto';
 import {
   DEFAULT_SAMPLE_PATH_COUNT,
+  fxForecastSymbol,
+  tenorToTradingDays,
+  type UnderlyingAssetClass,
   PAYOFF_CURVE_SHOCKS,
   SCENARIO_SHOCKS,
   type BreakevenPoint,
@@ -25,9 +28,12 @@ import { findBreakevenShocks } from '../../engines/risk/breakeven.js';
 import { outcomeMetrics } from '../../engines/risk/outcome.js';
 import { AppError } from '../../utils/errors.js';
 import { ForecastError, type ForecastClient } from '../ai/forecastClient.js';
+import type { HistoryProvider } from '../market-data/history/yahooHistoryProvider.js';
 import type { MarketDataService } from '../market-data/marketDataService.js';
+import { requestFanHistory } from './fanHistory.js';
 import {
   buildModeACases,
+  forecastRecordMetadata,
   summarizeDistribution,
   type ModeACase,
   type PathOutcome,
@@ -45,6 +51,8 @@ export interface SimulateDeps {
   forecast?: ForecastClient;
   /** Where runs are kept for /api/suitability, /api/explain and /api/chat. */
   records?: SimulationRecords;
+  /** Daily closes for the Mode A fan chart; absent when no history provider is configured. */
+  history?: HistoryProvider;
 }
 
 type Details = SimulateModeBResponse['result']['details'];
@@ -61,6 +69,13 @@ function modeAEvaluator(request: SimulateModeARequest): (path: readonly number[]
     return (path) => {
       const r = elnPayoff(request.terms, path);
       return { payoff: r.payoff, knockedIn: r.knockedIn, details: { ...r } };
+    };
+  }
+  if (request.productType === 'DCD') {
+    // DCD pays on the FX fixing at maturity only: X_T is the last value of the path.
+    return (path) => {
+      const r = dcdPayoff(request.terms, path[path.length - 1]!);
+      return { payoff: r.payoff, knockedIn: null, details: { ...r } };
     };
   }
   return (path) => {
@@ -140,6 +155,21 @@ function modeBOutcome(request: ProductInput, startLevel: number, shockPct: numbe
   return { shockedLevel, payoff, knockedIn, details, ...outcomeMetrics(invested, payoff) };
 }
 
+/** What Mode A forecasts: the underlying (ELN, CPN) or the FX pair (DCD). */
+function forecastUnderlying(request: SimulateModeARequest): {
+  symbol: string;
+  assetClass: UnderlyingAssetClass;
+} {
+  if (request.productType === 'DCD') {
+    const t = request.terms;
+    return { symbol: fxForecastSymbol(t.depositCurrency, t.alternateCurrency), assetClass: 'fx' };
+  }
+  return request.terms.underlying;
+}
+
+const investedOf = (request: ProductInput) =>
+  request.productType === 'DCD' ? request.terms.depositAmount : request.terms.notional;
+
 function caseResult(c: ModeACase<EngineOutcome>, invested: number): ModeACaseResult {
   return {
     percentile: c.percentile,
@@ -158,10 +188,17 @@ export function createSimulateService(deps: SimulateDeps): SimulateService {
       if (!deps.forecast) {
         throw new AppError('AI_UNAVAILABLE', 'The forecast service is not configured: use Mode B');
       }
+      const underlying = forecastUnderlying(request);
+      // History is fetched alongside the forecast, so it adds no latency.
+      const history = requestFanHistory(
+        deps.history,
+        underlying,
+        tenorToTradingDays(request.terms.tenorDays),
+      );
       let forecast;
       try {
         forecast = await deps.forecast.forecast({
-          underlying: request.terms.underlying,
+          underlying,
           tenorDays: request.terms.tenorDays,
           trainingWindowYears: request.trainingWindowYears,
           samplePathCount: DEFAULT_SAMPLE_PATH_COUNT,
@@ -174,7 +211,7 @@ export function createSimulateService(deps: SimulateDeps): SimulateService {
       }
 
       const evaluate = modeAEvaluator(request);
-      const invested = request.terms.notional;
+      const invested = investedOf(request);
       const [low, base, high] = buildModeACases(forecast, evaluate).map((c) =>
         caseResult(c, invested),
       );
@@ -197,6 +234,7 @@ export function createSimulateService(deps: SimulateDeps): SimulateService {
         },
         backtest: forecast.backtest,
         ...shockTable(request, forecast.data.spot),
+        history: await history.match(forecast.data.spot, forecast.data.asOf),
         notice: MODE_A_NOTICE,
       };
       deps.records?.save({
@@ -204,6 +242,7 @@ export function createSimulateService(deps: SimulateDeps): SimulateService {
         createdAt: Date.now(),
         request,
         response,
+        forecastMeta: forecastRecordMetadata(forecast),
       });
       return response;
     },

@@ -1,7 +1,8 @@
 // Client profile (PRD §7.1): risk appetite, horizon, loss tolerance, concentration.
 import { Compass } from 'lucide-react';
 import type { ProfileForm, RiskAppetite } from '../../state/forms';
-import { Field, Placeholder, Segmented, TextInput, Tile } from '../ui';
+import { Field, Segmented, TextInput, Tile } from '../ui';
+import { SavedProfiles } from './SavedProfiles';
 
 interface Props {
   profile: ProfileForm;
@@ -74,14 +75,16 @@ export function ClientProfileForm({ profile, onChange }: Props) {
         </div>
       </div>
 
+      <SavedProfiles profile={profile} onChange={onChange} />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Client reference" htmlFor="client-ref" hint="Internal reference, not a name.">
           <TextInput
             id="client-ref"
             value={profile.clientRef}
-            onChange={(v) => set('clientRef', v)}
+            onChange={(v) => onChange({ ...profile, clientRef: v, profileId: null })}
             placeholder="e.g. CL-0042"
-            maxLength={40}
+            maxLength={64}
           />
         </Field>
         <Field label="Profile label" htmlFor="client-label">
@@ -90,7 +93,7 @@ export function ClientProfileForm({ profile, onChange }: Props) {
             value={profile.label}
             onChange={(v) => set('label', v)}
             placeholder="e.g. Retirement portfolio"
-            maxLength={80}
+            maxLength={120}
           />
         </Field>
       </div>
@@ -146,11 +149,6 @@ export function ClientProfileForm({ profile, onChange }: Props) {
           onChange={(v) => set('concentrationPct', v)}
         />
       </div>
-
-      <Placeholder
-        title="Load a saved profile"
-        reason="Saved client profiles come from /api/client-profiles, which is not built yet. The profile above is kept in this browser tab only."
-      />
     </Tile>
   );
 }

@@ -22,8 +22,8 @@ export function createAdvisoryController(
   advisory: AdvisoryService,
 ): AdvisoryController {
   return {
-    suitability: (req, res) => {
-      res.json(suitability.assess(suitabilityRequestSchema.parse(req.body)));
+    suitability: async (req, res) => {
+      res.json(await suitability.assess(suitabilityRequestSchema.parse(req.body)));
     },
     explain: async (req, res) => {
       res.json(await advisory.explain(explainRequestSchema.parse(req.body).simulationId));

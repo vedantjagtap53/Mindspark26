@@ -1,0 +1,109 @@
+{
+  "method": "rerun with model 1.0.1, same settings as data/backtest_results.json",
+  "results": [
+    {
+      "horizonDays": 7,
+      "tradingDays": 5,
+      "samples": 83,
+      "bandCoverage": 0.855,
+      "baseMapePct": 1.86,
+      "naiveMapePct": 1.87
+    },
+    {
+      "horizonDays": 14,
+      "tradingDays": 10,
+      "samples": 83,
+      "bandCoverage": 0.916,
+      "baseMapePct": 2.51,
+      "naiveMapePct": 2.54
+    },
+    {
+      "horizonDays": 30,
+      "tradingDays": 21,
+      "samples": 82,
+      "bandCoverage": 0.927,
+      "baseMapePct": 3.6,
+      "naiveMapePct": 3.67
+    },
+    {
+      "horizonDays": 45,
+      "tradingDays": 31,
+      "samples": 82,
+      "bandCoverage": 0.878,
+      "baseMapePct": 4.76,
+      "naiveMapePct": 4.9
+    },
+    {
+      "horizonDays": 60,
+      "tradingDays": 41,
+      "samples": 81,
+      "bandCoverage": 0.84,
+      "baseMapePct": 5.37,
+      "naiveMapePct": 5.6
+    },
+    {
+      "horizonDays": 90,
+      "tradingDays": 62,
+      "samples": 80,
+      "bandCoverage": 0.875,
+      "baseMapePct": 6.88,
+      "naiveMapePct": 7.08
+    },
+    {
+      "horizonDays": 120,
+      "tradingDays": 83,
+      "samples": 79,
+      "bandCoverage": 0.848,
+      "baseMapePct": 7.9,
+      "naiveMapePct": 8.5
+    },
+    {
+      "horizonDays": 180,
+      "tradingDays": 124,
+      "samples": 77,
+      "bandCoverage": 0.87,
+      "baseMapePct": 9.38,
+      "naiveMapePct": 10.09
+    },
+    {
+      "horizonDays": 270,
+      "tradingDays": 186,
+      "samples": 74,
+      "bandCoverage": 0.878,
+      "baseMapePct": 9.77,
+      "naiveMapePct": 11.21
+    },
+    {
+      "horizonDays": 365,
+      "tradingDays": 252,
+      "samples": 71,
+      "bandCoverage": 0.873,
+      "baseMapePct": 10.15,
+      "naiveMapePct": 12.92
+    },
+    {
+      "horizonDays": 545,
+      "tradingDays": 376,
+      "samples": 65,
+      "bandCoverage": 0.892,
+      "baseMapePct": 12.21,
+      "naiveMapePct": 18.12
+    },
+    {
+      "horizonDays": 730,
+      "tradingDays": 504,
+      "samples": 59,
+      "bandCoverage": 0.932,
+      "baseMapePct": 14.02,
+      "naiveMapePct": 22.87
+    },
+    {
+      "horizonDays": 1095,
+      "tradingDays": 756,
+      "samples": 47,
+      "bandCoverage": 0.957,
+      "baseMapePct": 15.63,
+      "naiveMapePct": 32.41
+    }
+  ]
+}

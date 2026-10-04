@@ -12,6 +12,12 @@ export default defineConfig(
     '**/build/',
     '**/coverage/',
     'dataconnect/.dataconnect/',
+    // pip vendors JS files into Python virtual environments.
+    '**/.venv/',
+    'playwright-report/',
+    'test-results/',
+    // Pre-workspace prototype kept for reference; not part of the build (see IMPLEMENTATION_STATUS.md).
+    'Frontend/',
   ]),
   js.configs.recommended,
   tseslint.configs.recommendedTypeChecked,

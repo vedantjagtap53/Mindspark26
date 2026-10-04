@@ -31,6 +31,8 @@ export interface AppConfig {
     /** Maximum age of a live price, in seconds. */
     maxAgeSeconds: number;
     fx: { apiUrl: string; maxAgeDays: number };
+    /** Daily closes for the fan chart; `none` disables it. */
+    history: { provider: 'none' | 'yahoo'; apiUrl: string };
   };
 }
 
@@ -60,6 +62,7 @@ export function buildConfig(env: Env): AppConfig {
       upstox: { accessToken: env.UPSTOX_ACCESS_TOKEN, apiUrl: env.UPSTOX_API_URL },
       maxAgeSeconds: env.MARKET_DATA_MAX_AGE_SECONDS,
       fx: { apiUrl: env.FX_API_URL, maxAgeDays: env.FX_RATE_MAX_AGE_DAYS },
+      history: { provider: env.MARKET_HISTORY_PROVIDER, apiUrl: env.MARKET_HISTORY_API_URL },
     },
   };
 }

@@ -38,9 +38,9 @@ describe('termIssues (shared schemas)', () => {
 });
 
 describe('runSettingsFor', () => {
-  it('moves DCD to Mode B and the FX reference rate', () => {
+  it('keeps Mode A for DCD and moves a live level to the FX reference rate', () => {
     const next = runSettingsFor('ELN', 'DCD', { ...DEFAULT_RUN, mode: 'A', levelSource: 'live' });
-    expect(next.mode).toBe('B');
+    expect(next.mode).toBe('A');
     expect(next.levelSource).toBe('reference');
   });
 

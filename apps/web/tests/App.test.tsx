@@ -58,6 +58,7 @@ const suitability: SuitabilityResponse = {
   ],
   lowCase: { label: '-25% shock', returnPct: -3, knockedIn: false },
   productRiskRating: 'High',
+  persisted: false,
 };
 
 const explanation: ExplainResponse = {
@@ -77,11 +78,26 @@ const explanation: ExplainResponse = {
   model: 'gemini-2.5-flash',
 };
 
+const savedProfiles = [
+  {
+    id: '6f1c1f5e-3b0a-4a76-9b2c-1d2e3f4a5b6c',
+    clientRef: 'CL-0042',
+    label: 'Retirement',
+    riskAppetite: 'low',
+    horizonMonths: 36,
+    lossTolerancePct: 5,
+    concentrationPct: 20,
+    createdAt: '2026-10-01T00:00:00.000Z',
+    updatedAt: '2026-10-01T00:00:00.000Z',
+  },
+];
+
 /** Routes the stubbed API by path, recording each request body. */
 function backend() {
   const bodies: Record<string, unknown[]> = {};
   const fetchMock = vi.fn((url: string, init: RequestInit) => {
-    (bodies[url] ??= []).push(JSON.parse(init.body as string));
+    if (init?.body) (bodies[url] ??= []).push(JSON.parse(init.body as string));
+    if (url === '/api/client-profiles') return json(200, { profiles: savedProfiles });
     if (url === '/api/simulate') return json(200, modeB);
     if (url === '/api/suitability') return json(200, suitability);
     if (url === '/api/explain') return json(200, explanation);
@@ -156,8 +172,10 @@ describe('Payoff Desk journey', () => {
     fireEvent.click(run);
 
     expect(await screen.findByText('₹10,47,500')).toBeTruthy();
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe('/api/simulate');
+    const [, init] = fetchMock.mock.calls.find(([u]) => u === '/api/simulate') as unknown as [
+      string,
+      RequestInit,
+    ];
     expect(JSON.parse(init.body as string)).toMatchObject({
       mode: 'B',
       productType: 'ELN',
@@ -219,6 +237,64 @@ describe('Payoff Desk journey', () => {
     });
   });
 
+  it('loads a saved profile and links the verdict to it', async () => {
+    const { bodies } = backend();
+    render(<App />);
+    const select = await screen.findByLabelText('Saved profile');
+    await screen.findByRole('option', { name: /CL-0042/ });
+    fireEvent.change(select, { target: { value: savedProfiles[0]!.id } });
+    fireEvent.click(screen.getByRole('button', { name: /Load saved profile/ }));
+    expect(screen.getByLabelText<HTMLInputElement>('Client reference').value).toBe('CL-0042');
+    expect(screen.getByRole('button', { name: /Update saved profile/ })).toBeTruthy();
+
+    await runModeB();
+    await waitFor(() =>
+      expect(bodies['/api/suitability']).toEqual([
+        {
+          simulationId: 'sim-1',
+          profileId: savedProfiles[0]!.id,
+          profile: {
+            riskAppetite: 'low',
+            horizonMonths: 36,
+            lossTolerancePct: 5,
+            concentrationPct: 20,
+          },
+        },
+      ]),
+    );
+  });
+
+  it('saves a new profile through /api/client-profiles', async () => {
+    const created = {
+      ...savedProfiles[0]!,
+      id: '11111111-2222-4333-8444-555555555555',
+      clientRef: 'CL-7',
+    };
+    const posted: unknown[] = [];
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        posted.push(JSON.parse(init.body as string));
+        return json(201, created);
+      }
+      return json(200, { profiles: [] });
+    });
+    render(<App />);
+    fireEvent.change(screen.getByLabelText('Client reference'), { target: { value: 'CL-7' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Save profile/ }));
+    expect(await screen.findByText('Saved CL-7.')).toBeTruthy();
+    expect(posted[0]).toMatchObject({ clientRef: 'CL-7', label: null, riskAppetite: 'medium' });
+  });
+
+  it('shows the backend error when saved profiles are unavailable', async () => {
+    vi.stubGlobal('fetch', () =>
+      json(503, {
+        error: { code: 'DATABASE_NOT_CONFIGURED', message: 'Saved profiles need the database' },
+      }),
+    );
+    render(<App />);
+    expect(await screen.findByText(/DATABASE_NOT_CONFIGURED/)).toBeTruthy();
+  });
+
   it('shows a forecast failure as-is and offers Mode B instead of a substitute', async () => {
     vi.stubGlobal('fetch', () =>
       json(503, { error: { code: 'AI_UNAVAILABLE', message: 'Forecast service unavailable' } }),
@@ -276,11 +352,20 @@ describe('Payoff Desk journey', () => {
     expect(screen.getByLabelText(/Starting level \(S/)).toBeTruthy();
   });
 
-  it('does not offer Mode A for DCD', () => {
+  it('offers Mode A for DCD and sends the FX terms to the backend', async () => {
+    const { bodies } = backend();
     render(<App />);
     fireEvent.click(screen.getByRole('radio', { name: 'DCD' }));
     goToSimulate();
     const modeA = screen.getByRole<HTMLButtonElement>('radio', { name: /Mode A/ });
-    expect(modeA.disabled).toBe(true);
+    expect(modeA.disabled).toBe(false);
+    fireEvent.click(modeA);
+    fireEvent.click(screen.getByRole('button', { name: /Run simulation/ }));
+    await waitFor(() => expect(bodies['/api/simulate']).toHaveLength(1));
+    expect(bodies['/api/simulate']![0]).toMatchObject({
+      mode: 'A',
+      productType: 'DCD',
+      terms: { depositCurrency: 'USD', alternateCurrency: 'INR' },
+    });
   });
 });

@@ -16,9 +16,11 @@ Base path: `/api`
 
 ## `POST /suitability`, `/explain`, `/chat` (built 2026-10-04)
 
-Every `/simulate` response carries a `simulationId`. The backend keeps the run (request, results, then profile, verdict and explanation) in API memory, approved by Karan on 2026-10-04 until Firebase persistence is wired; ids are lost on restart and expire after 12 hours (`NOT_FOUND`). The browser never sends results back.
+Every `/simulate` response carries a `simulationId`. The backend keeps the run (request, results, then profile, verdict and explanation) in API memory as working state for suitability, explain and chat; ids are lost on restart and expire after 12 hours (`NOT_FOUND`). The browser never sends results back.
 
-- `/suitability` — request `{ simulationId, profile: { riskAppetite: "low"|"medium"|"high", horizonMonths, lossTolerancePct, concentrationPct } }`; response `{ simulationId, verdict, flags: [{ rule, severity: "caution"|"not_suitable", message }], lowCase: { label, returnPct, knockedIn }, productRiskRating }`. Rules: `docs/suitability-rules.md`.
+**Persistence (2026-10-04).** When Firebase SQL Connect is configured, `/suitability` writes the audit record before answering: the product configuration (once per run), the simulation with its risk results and a frozen profile snapshot, linked to the saved profile when `profileId` is sent, and the verdict with its flags and `rulesVersion`. `/explain` then stores the explanation against that record. Sample paths and the fan are never stored. A database failure fails the request (`DATABASE_ERROR`, 500); nothing is written anywhere else. Without a configured database (development, tests) nothing is persisted and the response says `persisted: false`. A second `/suitability` call for the same run writes a new simulation record for the new profile.
+
+- `/suitability` — request `{ simulationId, profile: { riskAppetite: "low"|"medium"|"high", horizonMonths, lossTolerancePct, concentrationPct }, profileId? }` (`profileId`: a saved profile's id, added 2026-10-04 to link the audit record; unknown id → `NOT_FOUND`); response `{ simulationId, verdict, flags: [{ rule, severity: "caution"|"not_suitable", message }], lowCase: { label, returnPct, knockedIn }, productRiskRating, persisted }`. Rules: `docs/suitability-rules.md`.
 - `/explain` — request `{ simulationId }` (after `/suitability`, otherwise `VALIDATION_ERROR`); response `{ simulationId, verdict, sections: { whatItIs, bestCase, worstCase, lossTriggers, suitabilityReasoning }, riskNotice, checksPassed, ungroundedNumbers, sources, model }`.
 - `/chat` — request `{ simulationId, question (1–1,000 chars), history: [{ role: "user"|"assistant", content }] (≤ 40) }`; response `{ simulationId, answer, scope: "in_scope"|"out_of_scope", checksPassed, riskNote, sources, model }`.
 
@@ -32,7 +34,11 @@ Requested by Karan on 2026-10-04 (live ticker in the UI). The browser never conn
 - Server sends `{ "type": "subscribed", "symbol", "provider" }`, then `{ "type": "tick", "symbol", "price", "asOf" }` for each trade (none while the market is closed), or `{ "type": "error", "code", "message" }` (`MARKET_DATA_UNAVAILABLE` when no feed is configured or the symbol is not covered, `VALIDATION_ERROR` for a bad message).
 - Upgrade requests on any other path are refused.
 
-`/client-profiles` was approved by Karan on 2026-10-03 so the RM can reuse client profiles in `/suitability`. It is supporting CRUD, not CRM: no login, ownership or roles. Profile fields: risk appetite, investment horizon, loss tolerance, concentration. Delete and the exact field schema are still to be confirmed.
+`/client-profiles` was approved by Karan on 2026-10-03 so the RM can reuse client profiles in `/suitability`. It is supporting CRUD, not CRM: no login, ownership or roles. Built 2026-10-04 on the decided database fields (`DATABASE_SCHEMA.md`); no delete.
+
+- Body (POST, PUT): `{ clientRef (1–64 chars, unique, never a name), label? (≤ 120 chars or null), riskAppetite, horizonMonths, lossTolerancePct, concentrationPct }` (same ranges as `/suitability`'s profile). Unknown fields are rejected. PUT replaces every field.
+- Responses: a profile is `{ id, clientRef, label, riskAppetite, horizonMonths, lossTolerancePct, concentrationPct, createdAt, updatedAt }`; POST returns 201; `GET /client-profiles?limit=1..100&offset=0..` (default 50) returns `{ profiles }`, most recently updated first.
+- Errors: `VALIDATION_ERROR` (400, including a non-UUID id), `NOT_FOUND` (404), `CONFLICT` (409, duplicate `clientRef`), `DATABASE_NOT_CONFIGURED` (503), `DATABASE_ERROR` (500).
 
 ## `POST /configure`
 
@@ -44,7 +50,7 @@ Request: `{ "productType": "ELN" | "DCD" | "CPN", "terms": {...} }`. Percent fie
 | DCD     | `depositCurrency`, `alternateCurrency` (3-letter, different), `depositAmount > 0`, `tenorDays`, `strikeRate > 0` (alternate per 1 deposit unit), `enhancedRatePct >= 0`  |
 | CPN     | `underlying`, `notional > 0`, `tenorDays`, `protectionPct` 0–100, `participationPct > 0`, optional `capPct > 0`                                                          |
 
-ELN: omit both barrier fields for a plain ELN; the barrier must be below the strike. Response: `{ productType, terms, derived }`, where `terms` is normalized (currency codes upper-cased, symbols trimmed) and `derived` holds `tenorYears` (`tenorDays / 365`) and, for ELN, `variant` (`plain` or `barrier`). Invalid input returns `VALIDATION_ERROR` (400) with `details` listing each `path` and `message`. Nothing is persisted yet.
+ELN: omit both barrier fields for a plain ELN; the barrier must be below the strike. Response: `{ productType, terms, derived }`, where `terms` is normalized (currency codes upper-cased, symbols trimmed) and `derived` holds `tenorYears` (`tenorDays / 365`) and, for ELN, `variant` (`plain` or `barrier`). Invalid input returns `VALIDATION_ERROR` (400) with `details` listing each `path` and `message`. Configurations are persisted with the audit record at `/suitability`, not here.
 
 ## `POST /simulate` — Mode B
 
@@ -68,7 +74,9 @@ A live price older than `MARKET_DATA_MAX_AGE_SECONDS` (default 120) and an FX ra
 
 ## `POST /simulate` — Mode A
 
-Request: `{ "mode": "A", "productType": "ELN" | "CPN", "terms", "trainingWindowYears"?: 5 | 10 }` (default 10). `terms` are as in `/configure`. Mode A for DCD returns `NOT_IMPLEMENTED` (501) because there is no FX forecast yet.
+Request: `{ "mode": "A", "productType": "ELN" | "DCD" | "CPN", "terms", "trainingWindowYears"?: 5 | 10 }` (default 10). `terms` are as in `/configure`.
+
+DCD (added 2026-10-04): the backend asks the forecast service for the FX pair as `{ symbol: "<deposit><alternate>", assetClass: "fx" }`, e.g. `USDINR` (alternate units per 1 deposit unit, the strike's quote), and runs the DCD engine on `X_T` = the last value of each path. The symbol convention is a **proposal** awaiting the AI/ML developer: until the forecast service supports it, it answers `UNSUPPORTED_UNDERLYING` and Mode A for DCD returns `AI_UNAVAILABLE`.
 
 The backend calls the forecast service (`POST {AI_API_URL}/forecast`, contract in `docs/forecasting.md`) with the product's underlying and tenor and 500 sample paths. It validates the response, then runs the payoff engine on the low, base and high case paths and on every sample path.
 
@@ -77,12 +85,13 @@ Response: `{ mode, productType, spot: { value, asOf }, horizon: { tenorDays, tra
 - Each case has `{ percentile, terminal, pathMin, payoff, returnPct, lossAmount, knockedIn, details }`. An American barrier is tested against every value on the case path.
 - `distribution` is `{ pathCount, probabilityOfLoss, probabilityOfKnockIn, payoffQuantiles: { p5, p50, p95 } }`. Probabilities are fractions; `probabilityOfKnockIn` is `null` for products without a barrier.
 - `fan` holds P5/P50/P95 of the underlying per trading day (index 0 = spot). Sample paths are not returned.
+- `curve`, `scenarios`, `breakevens`: as in Mode B, computed from the forecast spot.
+- `history` (added 2026-10-04): `{ status: "ok", source, points: [{ date, close }] }` with up to 252 recent daily closes ending on the forecast's as-of date, or `{ status: "unavailable", reason }` when no provider is configured (`MARKET_HISTORY_PROVIDER`), it failed, or its close on that date differs from the forecast spot by more than 0.05%. Display only.
 
 | Code                  | HTTP | When                                                                                                |
 | --------------------- | ---- | --------------------------------------------------------------------------------------------------- |
 | `AI_UNAVAILABLE`      | 503  | Forecast service not configured, unreachable, timed out, or non-2xx (including 401 and stale data). |
 | `AI_INVALID_RESPONSE` | 502  | Forecast response failed contract validation. `details` lists the issues.                           |
-| `NOT_IMPLEMENTED`     | 501  | Mode A for DCD.                                                                                     |
 
 No fallback forecast is ever substituted.
 

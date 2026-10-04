@@ -82,11 +82,6 @@ describe('routing and error envelope', () => {
     expect(errorBody(res).code).toBe('NOT_FOUND');
   });
 
-  it('does not expose capabilities that are not built yet', async () => {
-    const res = await request(app()).post('/api/client-profiles').send({});
-    expect(res.status).toBe(404);
-  });
-
   it('returns VALIDATION_ERROR for malformed JSON bodies', async () => {
     const res = await request(app())
       .post('/api/health')
