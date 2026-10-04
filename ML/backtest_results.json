@@ -1,0 +1,149 @@
+{
+  "method": "walk-forward, expanding window (min 750 days), origins every 21 trading days, refit at each origin, 3000 paths, fixed drift 0.03%/trading day",
+  "results": [
+    {
+      "horizonDays": 7,
+      "tradingDays": 5,
+      "samples": 83,
+      "independentWindowsApprox": 345.4,
+      "bandCoverage": 0.855,
+      "belowBandRate": 0.072,
+      "aboveBandRate": 0.072,
+      "baseMapePct": 1.86,
+      "naiveMapePct": 1.87
+    },
+    {
+      "horizonDays": 14,
+      "tradingDays": 10,
+      "samples": 83,
+      "independentWindowsApprox": 173.2,
+      "bandCoverage": 0.904,
+      "belowBandRate": 0.048,
+      "aboveBandRate": 0.048,
+      "baseMapePct": 2.51,
+      "naiveMapePct": 2.54
+    },
+    {
+      "horizonDays": 30,
+      "tradingDays": 21,
+      "samples": 82,
+      "independentWindowsApprox": 82.0,
+      "bandCoverage": 0.927,
+      "belowBandRate": 0.049,
+      "aboveBandRate": 0.024,
+      "baseMapePct": 3.6,
+      "naiveMapePct": 3.67
+    },
+    {
+      "horizonDays": 45,
+      "tradingDays": 31,
+      "samples": 82,
+      "independentWindowsApprox": 55.9,
+      "bandCoverage": 0.878,
+      "belowBandRate": 0.073,
+      "aboveBandRate": 0.049,
+      "baseMapePct": 4.76,
+      "naiveMapePct": 4.9
+    },
+    {
+      "horizonDays": 60,
+      "tradingDays": 41,
+      "samples": 81,
+      "independentWindowsApprox": 42.0,
+      "bandCoverage": 0.84,
+      "belowBandRate": 0.062,
+      "aboveBandRate": 0.099,
+      "baseMapePct": 5.37,
+      "naiveMapePct": 5.6
+    },
+    {
+      "horizonDays": 90,
+      "tradingDays": 62,
+      "samples": 80,
+      "independentWindowsApprox": 27.8,
+      "bandCoverage": 0.875,
+      "belowBandRate": 0.062,
+      "aboveBandRate": 0.062,
+      "baseMapePct": 6.88,
+      "naiveMapePct": 7.08
+    },
+    {
+      "horizonDays": 120,
+      "tradingDays": 83,
+      "samples": 79,
+      "independentWindowsApprox": 20.7,
+      "bandCoverage": 0.848,
+      "belowBandRate": 0.063,
+      "aboveBandRate": 0.089,
+      "baseMapePct": 7.9,
+      "naiveMapePct": 8.5
+    },
+    {
+      "horizonDays": 180,
+      "tradingDays": 124,
+      "samples": 77,
+      "independentWindowsApprox": 13.9,
+      "bandCoverage": 0.87,
+      "belowBandRate": 0.065,
+      "aboveBandRate": 0.065,
+      "baseMapePct": 9.38,
+      "naiveMapePct": 10.09
+    },
+    {
+      "horizonDays": 270,
+      "tradingDays": 186,
+      "samples": 74,
+      "independentWindowsApprox": 9.2,
+      "bandCoverage": 0.865,
+      "belowBandRate": 0.014,
+      "aboveBandRate": 0.122,
+      "baseMapePct": 9.77,
+      "naiveMapePct": 11.21
+    },
+    {
+      "horizonDays": 365,
+      "tradingDays": 252,
+      "samples": 71,
+      "independentWindowsApprox": 6.8,
+      "bandCoverage": 0.873,
+      "belowBandRate": 0.0,
+      "aboveBandRate": 0.127,
+      "baseMapePct": 10.15,
+      "naiveMapePct": 12.92
+    },
+    {
+      "horizonDays": 545,
+      "tradingDays": 376,
+      "samples": 65,
+      "independentWindowsApprox": 4.6,
+      "bandCoverage": 0.892,
+      "belowBandRate": 0.0,
+      "aboveBandRate": 0.108,
+      "baseMapePct": 12.22,
+      "naiveMapePct": 18.12
+    },
+    {
+      "horizonDays": 730,
+      "tradingDays": 504,
+      "samples": 59,
+      "independentWindowsApprox": 3.4,
+      "bandCoverage": 0.932,
+      "belowBandRate": 0.0,
+      "aboveBandRate": 0.068,
+      "baseMapePct": 14.03,
+      "naiveMapePct": 22.87
+    },
+    {
+      "horizonDays": 1095,
+      "tradingDays": 756,
+      "samples": 47,
+      "independentWindowsApprox": 2.3,
+      "bandCoverage": 0.936,
+      "belowBandRate": 0.0,
+      "aboveBandRate": 0.064,
+      "baseMapePct": 15.64,
+      "naiveMapePct": 32.41
+    }
+  ],
+  "caveat": "Origins overlap, so independentWindowsApprox (origin span / horizon + 1) is a rough count. Horizons beyond 365 days rest on 2-5 independent windows in a rising market. Drift was chosen after seeing earlier backtest results. Horizons under 7 days not tested."
+}
