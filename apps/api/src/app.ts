@@ -1,0 +1,49 @@
+import express, { type Express } from 'express';
+import { API_BASE_PATH } from '@mindspark/shared';
+import type { AppConfig } from './config/index.js';
+import { createErrorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { createApiRouter, type ApiDeps } from './routes/index.js';
+import { createForecastClient, type ForecastClient } from './services/ai/forecastClient.js';
+import { createRagClient, type RagClient } from './services/ai/ragClient.js';
+import { createMarketData } from './services/market-data/createMarketData.js';
+import { createMemorySimulationRecords } from './services/simulation/simulationRecords.js';
+import { consoleLogger, type Logger } from './utils/logger.js';
+
+export const JSON_BODY_LIMIT = '1mb';
+
+/** Forecast client for Mode A, or `undefined` when AI_API_URL is not set. */
+function forecastClientFromConfig(config: AppConfig): ForecastClient | undefined {
+  const { baseUrl, apiKey, forecastTimeoutMs } = config.ai;
+  return baseUrl
+    ? createForecastClient({ baseUrl, apiKey: apiKey ?? '', timeoutMs: forecastTimeoutMs })
+    : undefined;
+}
+
+/** Explanation/chat client, or `undefined` when RAG_API_URL is not set. */
+function ragClientFromConfig(config: AppConfig): RagClient | undefined {
+  const { baseUrl, apiKey, timeoutMs } = config.ai.rag;
+  return baseUrl ? createRagClient({ baseUrl, apiKey, timeoutMs }) : undefined;
+}
+
+/** `deps` lets the server own the market-data connection (to close it on shutdown) and tests inject fakes. */
+export function createApp(
+  config: AppConfig,
+  logger: Logger = consoleLogger,
+  deps: Partial<ApiDeps> = {},
+): Express {
+  const app = express();
+  app.disable('x-powered-by');
+  app.use(express.json({ limit: JSON_BODY_LIMIT }));
+  app.use(
+    API_BASE_PATH,
+    createApiRouter(config, {
+      marketData: deps.marketData ?? createMarketData(config, logger).service,
+      forecast: 'forecast' in deps ? deps.forecast : forecastClientFromConfig(config),
+      records: deps.records ?? createMemorySimulationRecords(),
+      rag: 'rag' in deps ? deps.rag : ragClientFromConfig(config),
+    }),
+  );
+  app.use(notFoundHandler);
+  app.use(createErrorHandler(logger));
+  return app;
+}

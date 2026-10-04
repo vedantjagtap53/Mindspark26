@@ -1,0 +1,500 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-serif: 'Source Serif 4', Georgia, Cambria, 'Times New Roman', Times, serif;
+}
+
+/* ========================================================================= */
+/* MULTI-THEME COLOR SYSTEM FOR PAYOFF DESK                                  */
+/* ========================================================================= */
+
+:root,
+[data-theme='executive'] {
+  /* Executive Alabaster & Midnight Slate (Default: Crisp, high-contrast, prestigious) */
+  --canvas-bg: #f4f2eb;
+  --canvas-text: #0f172a;
+  --card-bg: #ffffff;
+  --card-bg-light: #faf9f5;
+  --well-bg: #eae6db;
+  --well-deep: #ded8ca;
+  --well-text: #0f172a;
+
+  --border-color: rgba(15, 23, 42, 0.12);
+  --border-strong: rgba(15, 23, 42, 0.22);
+  --border-subtle: rgba(15, 23, 42, 0.06);
+
+  --ink-primary: #0f172a;
+  --ink-secondary: #334155;
+  --ink-muted: #64748b;
+
+  --accent-primary: #1e293b;
+  --accent-gradient: linear-gradient(145deg, #2d3d54, #141d2b);
+  --accent-hover: linear-gradient(145deg, #3a4e6b, #1b2638);
+  --accent-text: #ffffff;
+  --accent-gold: #c59b27;
+
+  --shadow-clay: 0 10px 25px -4px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(0, 0, 0, 0.02);
+  --shadow-interactive: 0 14px 32px -4px rgba(15, 23, 42, 0.13), 0 4px 10px rgba(0, 0, 0, 0.03);
+  --inner-highlight: inset 0 1.5px 2px rgba(255, 255, 255, 0.95);
+
+  --status-suitable-bg: #ecfdf5;
+  --status-suitable-text: #065f46;
+  --status-suitable-border: #a7f3d0;
+
+  --status-caution-bg: #fffbeb;
+  --status-caution-text: #92400e;
+  --status-caution-border: #fde68a;
+
+  --status-breach-bg: #fef2f2;
+  --status-breach-text: #991b1b;
+  --status-breach-border: #fecaca;
+
+  --chart-payoff-stroke: #1e293b;
+  --chart-grid-stroke: #e2dfd7;
+  --chart-area-fill: #1e293b;
+}
+
+[data-theme='midnight'] {
+  /* Midnight Terminal (Sleek dark mode: Deep Obsidian, Slate, Cyan / Emerald) */
+  --canvas-bg: #0b0f17;
+  --canvas-text: #f8fafc;
+  --card-bg: #141b26;
+  --card-bg-light: #1a2332;
+  --well-bg: #0e141d;
+  --well-deep: #080c12;
+  --well-text: #f1f5f9;
+
+  --border-color: rgba(255, 255, 255, 0.14);
+  --border-strong: rgba(255, 255, 255, 0.25);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+
+  --ink-primary: #f8fafc;
+  --ink-secondary: #cbd5e1;
+  --ink-muted: #94a3b8;
+
+  --accent-primary: #38bdf8;
+  --accent-gradient: linear-gradient(145deg, #0284c7, #0369a1);
+  --accent-hover: linear-gradient(145deg, #0ea5e9, #0284c7);
+  --accent-text: #ffffff;
+  --accent-gold: #38bdf8;
+
+  --shadow-clay: 0 10px 25px -4px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-interactive: 0 14px 32px -4px rgba(0, 0, 0, 0.6), 0 4px 10px rgba(0, 0, 0, 0.4);
+  --inner-highlight: inset 0 1px 1px rgba(255, 255, 255, 0.15);
+
+  --status-suitable-bg: rgba(16, 185, 129, 0.18);
+  --status-suitable-text: #34d399;
+  --status-suitable-border: rgba(52, 211, 153, 0.35);
+
+  --status-caution-bg: rgba(245, 158, 11, 0.18);
+  --status-caution-text: #fbbf24;
+  --status-caution-border: rgba(251, 191, 36, 0.35);
+
+  --status-breach-bg: rgba(239, 68, 68, 0.18);
+  --status-breach-text: #f87171;
+  --status-breach-border: rgba(248, 113, 113, 0.35);
+
+  --chart-payoff-stroke: #38bdf8;
+  --chart-grid-stroke: rgba(255, 255, 255, 0.12);
+  --chart-area-fill: #38bdf8;
+}
+
+[data-theme='sand'] {
+  /* Pale Sand (#D8C9AE) & Charcoal (#575757) */
+  --canvas-bg: #d8c9ae;
+  --canvas-text: #222222;
+  --card-bg: #ede4d3;
+  --card-bg-light: #f5efe6;
+  --well-bg: #dacbb2;
+  --well-deep: #cdbda0;
+  --well-text: #222222;
+
+  --border-color: rgba(87, 87, 87, 0.22);
+  --border-strong: rgba(87, 87, 87, 0.35);
+  --border-subtle: rgba(87, 87, 87, 0.12);
+
+  --ink-primary: #222222;
+  --ink-secondary: #444444;
+  --ink-muted: #707070;
+
+  --accent-primary: #575757;
+  --accent-gradient: linear-gradient(145deg, #626262, #474747);
+  --accent-hover: linear-gradient(145deg, #6c6c6c, #4f4f4f);
+  --accent-text: #ede4d3;
+  --accent-gold: #d8c9ae;
+
+  --shadow-clay: 0 10px 24px -4px rgba(87, 87, 87, 0.15), 0 2px 6px rgba(0, 0, 0, 0.04);
+  --shadow-interactive: 0 14px 30px -4px rgba(87, 87, 87, 0.22), 0 4px 10px rgba(0, 0, 0, 0.05);
+  --inner-highlight: inset 0 1.5px 2px rgba(255, 255, 255, 0.75);
+
+  --status-suitable-bg: #dce8de;
+  --status-suitable-text: #1a5430;
+  --status-suitable-border: #9bcca9;
+
+  --status-caution-bg: #efe6d1;
+  --status-caution-text: #7a5712;
+  --status-caution-border: #d6b978;
+
+  --status-breach-bg: #eedcdc;
+  --status-breach-text: #7f2222;
+  --status-breach-border: #d99b9b;
+
+  --chart-payoff-stroke: #575757;
+  --chart-grid-stroke: #dacbb2;
+  --chart-area-fill: #575757;
+}
+
+[data-theme='emerald'] {
+  /* Forest Emerald & Warm Pearl (Private Banking Heritage) */
+  --canvas-bg: #eceeea;
+  --canvas-text: #11221b;
+  --card-bg: #ffffff;
+  --card-bg-light: #f7faf8;
+  --well-bg: #dee4dc;
+  --well-deep: #ced8cb;
+  --well-text: #11221b;
+
+  --border-color: rgba(20, 52, 43, 0.15);
+  --border-strong: rgba(20, 52, 43, 0.25);
+  --border-subtle: rgba(20, 52, 43, 0.08);
+
+  --ink-primary: #11221b;
+  --ink-secondary: #2c4238;
+  --ink-muted: #5b7568;
+
+  --accent-primary: #154d39;
+  --accent-gradient: linear-gradient(145deg, #1c6349, #103b2c);
+  --accent-hover: linear-gradient(145deg, #237a5a, #144836);
+  --accent-text: #f0fdf4;
+  --accent-gold: #c59b27;
+
+  --shadow-clay: 0 10px 25px -4px rgba(20, 52, 43, 0.09), 0 2px 6px rgba(0, 0, 0, 0.02);
+  --shadow-interactive: 0 14px 32px -4px rgba(20, 52, 43, 0.14), 0 4px 10px rgba(0, 0, 0, 0.03);
+  --inner-highlight: inset 0 1.5px 2px rgba(255, 255, 255, 0.95);
+
+  --status-suitable-bg: #d1fae5;
+  --status-suitable-text: #065f46;
+  --status-suitable-border: #6ee7b7;
+
+  --status-caution-bg: #fef3c7;
+  --status-caution-text: #92400e;
+  --status-caution-border: #fcd34d;
+
+  --status-breach-bg: #fee2e2;
+  --status-breach-text: #991b1b;
+  --status-breach-border: #fca5a5;
+
+  --chart-payoff-stroke: #154d39;
+  --chart-grid-stroke: #dee4dc;
+  --chart-area-fill: #154d39;
+}
+
+/* Hide default cursor on desktop when precision custom cursor is active */
+@media (pointer: fine) {
+  html,
+  body,
+  button,
+  a,
+  select,
+  input,
+  textarea,
+  [role='button'],
+  label {
+    cursor: none !important;
+  }
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--canvas-bg);
+  color: var(--canvas-text);
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+/* ========================================================================= */
+/* DYNAMIC CLAYMORPHIC SURFACES & TACTILE DEPTH                              */
+/* ========================================================================= */
+
+.clay-tile {
+  background: var(--card-bg);
+  color: var(--ink-primary);
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-clay);
+  transition:
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.2s ease,
+    background 0.2s ease;
+  position: relative;
+}
+
+.clay-tile-light {
+  background: var(--card-bg-light);
+  border-radius: 18px;
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-clay);
+}
+
+.clay-tile-interactive {
+  background: var(--card-bg);
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-clay);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.clay-tile-interactive:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-interactive);
+}
+
+/* Clay Inset Wells for Inputs, Selects, and Readouts */
+.clay-inset {
+  background: var(--well-bg);
+  color: var(--well-text);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  box-shadow:
+    inset 2.5px 2.5px 5px rgba(0, 0, 0, 0.08),
+    inset -1.5px -1.5px 3px rgba(255, 255, 255, 0.6);
+  transition: all 0.18s ease;
+}
+
+.clay-inset:focus-within {
+  background: var(--card-bg);
+  border-color: var(--accent-primary);
+  box-shadow:
+    0 0 0 3px rgba(30, 41, 59, 0.16),
+    inset 1px 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Clay Tactile Buttons */
+.clay-btn-primary {
+  background: var(--accent-gradient);
+  color: var(--accent-text);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow:
+    0 6px 16px rgba(15, 23, 42, 0.25),
+    inset 0 1px 2px rgba(255, 255, 255, 0.35);
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.clay-btn-primary:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1.5px);
+  box-shadow:
+    0 8px 22px rgba(15, 23, 42, 0.35),
+    inset 0 1px 2px rgba(255, 255, 255, 0.45);
+}
+
+.clay-btn-primary:active {
+  transform: scale(0.98) translateY(1px);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+.clay-btn-secondary {
+  background: var(--card-bg);
+  color: var(--ink-primary);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  box-shadow:
+    0 3px 8px rgba(0, 0, 0, 0.06),
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.85);
+  transition: all 0.16s ease;
+}
+
+.clay-btn-secondary:hover {
+  background: var(--card-bg-light);
+  border-color: var(--border-strong);
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+}
+
+.clay-btn-secondary:active {
+  transform: scale(0.98);
+  box-shadow: inset 0 1.5px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Clay Segmented Switcher Track */
+.clay-segmented-track {
+  background: var(--well-bg);
+  border-radius: 14px;
+  padding: 4px;
+  border: 1px solid var(--border-color);
+  box-shadow:
+    inset 2px 2px 4px rgba(0, 0, 0, 0.08),
+    inset -1.5px -1.5px 3px rgba(255, 255, 255, 0.7);
+}
+
+.clay-segmented-active {
+  background: var(--accent-primary);
+  color: var(--accent-text);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 4px 10px rgba(0, 0, 0, 0.2),
+    inset 0 1px 1px rgba(255, 255, 255, 0.35);
+}
+
+/* Harmonized Mandate Status Badges */
+.clay-badge-suitable {
+  background: var(--status-suitable-bg);
+  color: var(--status-suitable-text);
+  border: 1px solid var(--status-suitable-border);
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.clay-badge-caution {
+  background: var(--status-caution-bg);
+  color: var(--status-caution-text);
+  border: 1px solid var(--status-caution-border);
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.clay-badge-unsafe {
+  background: var(--status-breach-bg);
+  color: var(--status-breach-text);
+  border: 1px solid var(--status-breach-border);
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+/* Journey Stepper Classes */
+.step-node {
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.step-node-active {
+  background: var(--accent-primary);
+  color: var(--accent-text);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  border-color: var(--accent-primary);
+}
+
+.step-node-completed {
+  background: var(--status-suitable-bg);
+  color: var(--status-suitable-text);
+  border-color: var(--status-suitable-border);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--canvas-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--well-deep);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
+}
+
+/* Keyframe Animations & Micro-Effects */
+@keyframes liveBeacon {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 7px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+@keyframes journeySlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-live-beacon {
+  animation: liveBeacon 2.2s infinite;
+}
+
+.animate-journey-step {
+  animation: journeySlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-modal-in {
+  animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-journey-step,
+  .animate-modal-in,
+  .animate-live-beacon {
+    animation: none;
+  }
+}
+
+/* Printing the memo: only the memo itself goes to paper. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+  .print-overlay {
+    position: static;
+    inset: auto;
+    padding: 0;
+    background: none;
+    backdrop-filter: none;
+    overflow: visible;
+  }
+  .print-memo {
+    max-width: none;
+    padding: 0;
+    box-shadow: none;
+  }
+}

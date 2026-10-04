@@ -1,0 +1,41 @@
+{
+  "name": "suitability-aware-payoff-simulator",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "dev:api": "npm run dev --workspace @mindspark/api",
+    "dev:web": "npm run dev --workspace @mindspark/web",
+    "dev:forecast": "node scripts/dev-service.mjs forecast",
+    "dev:rag": "node scripts/dev-service.mjs rag",
+    "rag:index": "node scripts/dev-service.mjs rag-index",
+    "build:web": "npm run build --workspace @mindspark/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "test": "npm run test --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "build:api": "npm run build --workspace @mindspark/api",
+    "start:api": "npm run start --workspace @mindspark/api"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "jsdom": "^29.1.1",
+    "prettier": "^3.9.9",
+    "typescript": "~6.0",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^5.0.3"
+  }
+}

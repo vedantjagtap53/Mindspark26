@@ -1,0 +1,5 @@
+# Operations the backend's Firebase adapter may run. Everything is server-only
+# (@auth(level: NO_ACCESS): callable with admin credentials, never from a browser).
+# The adapter must run these named operations only, never ad-hoc GraphQL.
+# There are deliberately no delete operations (see DATABASE_SCHEMA.md, "Deletes").
+connectorId: 'backend'

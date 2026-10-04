@@ -1,0 +1,160 @@
+# Firebase SQL Connect schema (PostgreSQL). Logical model: DATABASE_SCHEMA.md.
+# Internal to the Firebase database adapter; the application API stays REST.
+#
+# Conventions
+# - Percent fields are percent numbers (95 = 95%), as in the API. Probabilities are fractions (0.17 = 17%).
+# - Range checks (e.g. 0–100 %) are enforced by the backend's Zod schemas before any write;
+#   SQL Connect has no CHECK constraints.
+# - Typed columns hold what is queried or audited; full product terms and engine output are JSON.
+# - Product configurations are never edited, so a simulation's configuration is its frozen terms.
+#   Client profiles can be edited, so each simulation keeps a frozen copy of the profile it used.
+# - No client names or contact details are stored: clients are identified by the RM's own reference.
+# - Deletes: SQL Connect makes a required reference ON DELETE CASCADE and an optional one SET NULL,
+#   with no way to override it in the schema. Simulations and their results are audit evidence, so
+#   connectors must define NO delete mutations for product_configurations, simulations, risk_results,
+#   suitability_results or explanations. Deleting a client profile only clears simulations.profile;
+#   the frozen profileSnapshot remains.
+
+enum RiskAppetite {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ProductType {
+  ELN
+  DCD
+  CPN
+}
+
+enum SimulationMode {
+  A
+  B
+}
+
+"Where a Mode B starting level came from."
+enum LevelSource {
+  LIVE
+  MANUAL
+  REFERENCE
+}
+
+"Scenario a risk result belongs to: Mode A cases, or the single Mode B shock."
+enum ScenarioCase {
+  LOW
+  BASE
+  HIGH
+  SHOCK
+}
+
+enum SuitabilityVerdict {
+  SUITABLE
+  CAUTION
+  NOT_SUITABLE
+}
+
+type ClientProfile @table(name: "client_profiles") {
+  id: UUID! @default(expr: "uuidV4()")
+  "The RM's internal reference for the client (e.g. a CRM id). Not a name."
+  clientRef: String! @col(dataType: "varchar(64)") @unique
+  "Optional short label shown to the RM."
+  label: String @col(dataType: "varchar(120)")
+  riskAppetite: RiskAppetite!
+  horizonMonths: Int!
+  "Maximum acceptable loss, percent of notional (0–100)."
+  lossTolerancePct: Float!
+  "Share of the client's portfolio in this product or underlying, percent (0–100)."
+  concentrationPct: Float!
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type ProductConfiguration @table(name: "product_configurations") {
+  id: UUID! @default(expr: "uuidV4()")
+  productType: ProductType!
+  "ELN/CPN underlying symbol, e.g. ^NSEI. Null for DCD."
+  underlyingSymbol: String @col(dataType: "varchar(32)")
+  "DCD currencies (ISO 4217). Null for ELN/CPN."
+  depositCurrency: String @col(dataType: "char(3)")
+  alternateCurrency: String @col(dataType: "char(3)")
+  tenorDays: Int!
+  "Notional (ELN/CPN) or deposit amount (DCD)."
+  notional: Float!
+  "Normalized terms exactly as returned by POST /api/configure (packages/shared/src/schemas/product.ts)."
+  terms: Any!
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type Simulation @table(name: "simulations") {
+  id: UUID! @default(expr: "uuidV4()")
+  "Saved profile used, if any. The frozen copy below is the audit record."
+  profile: ClientProfile
+  configuration: ProductConfiguration!
+  mode: SimulationMode!
+  "Client profile as it was at simulation time. Null when no profile was given."
+  profileSnapshot: Any
+
+  # Mode B only
+  levelValue: Float
+  levelSource: LevelSource
+  "ISO timestamp (live) or date (reference rate); null for a manual level."
+  levelAsOf: String @col(dataType: "varchar(32)")
+  shockPct: Float
+  shockedLevel: Float
+
+  # Mode A only
+  trainingWindowYears: Int
+  "Forecast metadata (DATABASE_SCHEMA.md): contract version, model, data, horizon, terminal quantiles, case terminals, backtest. No sample paths or fan."
+  forecastMeta: Any
+  pathCount: Int
+  probabilityOfLoss: Float
+  "Null when the product has no barrier."
+  probabilityOfKnockIn: Float
+  payoffP5: Float
+  payoffP50: Float
+  payoffP95: Float
+
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+"One row per scenario: LOW/BASE/HIGH for Mode A, SHOCK for Mode B."
+type RiskResult @table(name: "risk_results", key: ["simulation", "scenario"]) {
+  simulation: Simulation!
+  scenario: ScenarioCase!
+  "Mode A case percentile (5/50/95); null for Mode B."
+  percentile: Int
+  "S_T for ELN/CPN, X_T for DCD."
+  terminal: Float!
+  "Lowest level on a Mode A case path; null for Mode B."
+  pathMin: Float
+  payoff: Float!
+  returnPct: Float!
+  lossAmount: Float!
+  "Null when the product has no barrier."
+  knockedIn: Boolean
+  "Product-specific engine output."
+  details: Any!
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type SuitabilityResult @table(name: "suitability_results") {
+  id: UUID! @default(expr: "uuidV4()")
+  simulation: Simulation! @unique
+  verdict: SuitabilityVerdict!
+  "Every raised flag with its rule, severity (hard or not) and reason."
+  flags: Any!
+  "Version of the deterministic rule set that produced the verdict."
+  rulesVersion: String! @col(dataType: "varchar(32)")
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type Explanation @table(name: "explanations") {
+  id: UUID! @default(expr: "uuidV4()")
+  simulation: Simulation!
+  text: String!
+  "Model that wrote the text, as reported by the AI service."
+  model: String! @col(dataType: "varchar(120)")
+  "Sources the AI service cited, if any."
+  sources: Any
+  createdAt: Timestamp! @default(expr: "request.time")
+}

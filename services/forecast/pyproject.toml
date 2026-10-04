@@ -1,0 +1,10 @@
+[project]
+name = "forecast-service"
+version = "1.0.1"
+description = "Nifty 50 forecast service for Mode A (forecast contract v1.0, docs/forecasting.md)"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+# Run `pytest` from services/forecast; the package is imported from this folder, no install needed.
+pythonpath = ["."]
+testpaths = ["tests"]
