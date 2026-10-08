@@ -234,6 +234,7 @@ describe('Supabase repositories (fake PostgREST)', () => {
   const modeBInput = (riskResults: ModeBSimulationInput['riskResults']): ModeBSimulationInput => ({
     mode: 'B',
     configurationId: UUID,
+    userId: null,
     profileSnapshot: null,
     levelValue: 25_000,
     levelSource: 'live',
@@ -371,5 +372,122 @@ describe('Supabase repositories (fake PostgREST)', () => {
     for (const repo of Object.values(repos) as object[]) {
       expect(Object.keys(repo).filter((k) => /delete|remove|destroy/i.test(k))).toEqual([]);
     }
+  });
+});
+
+describe('runs linked to accounts and the activity log', () => {
+  const SINCE = '2026-10-01T00:00:00.000Z';
+
+  it('reads one account runs by user id, newest first, with the owner embedded', async () => {
+    const { repos, calls } = fakeDb();
+    await repos.simulations.listByUser(UUID, 25);
+    const call = calls[0]!;
+    expect(call.path).toBe('/rest/v1/simulations');
+    expect(call.search.get('user_id')).toBe(`eq.${UUID}`);
+    expect(call.search.get('order')).toContain('created_at.desc');
+    expect(call.search.get('limit')).toBe('25');
+    expect(call.search.get('select')).toContain('owner:app_users(id,email,display_name)');
+    expect(call.search.get('select')).toContain('user_id');
+  });
+
+  it('reads the runs saved at or after a time', async () => {
+    const { repos, calls } = fakeDb();
+    await repos.simulations.listSince(SINCE, 5001);
+    expect(calls[0]!.search.get('created_at')).toBe(`gte.${SINCE}`);
+    expect(calls[0]!.search.get('limit')).toBe('5001');
+  });
+
+  it('counts runs with a head request and never downloads them', async () => {
+    const { repos, calls } = fakeDb();
+    expect(await repos.simulations.count()).toBe(0);
+    expect(calls[0]!.method).toBe('HEAD');
+    expect(calls[0]!.headers.get('prefer')).toContain('count=exact');
+  });
+
+  it('sends the account with the run, and null when there is none', async () => {
+    const input = (userId: string | null): ModeBSimulationInput => ({
+      mode: 'B',
+      configurationId: UUID,
+      userId,
+      profileSnapshot: null,
+      levelValue: 25_000,
+      levelSource: 'manual',
+      levelAsOf: null,
+      shockPct: -10,
+      shockedLevel: 22_500,
+      riskResults: [
+        {
+          scenario: 'shock',
+          percentile: null,
+          terminal: 22_500,
+          pathMin: null,
+          payoff: 1,
+          returnPct: 0,
+          lossAmount: 0,
+          knockedIn: null,
+          details: {},
+        },
+      ],
+    });
+    const { repos, calls } = fakeDb(() => ({ body: UUID }));
+    await repos.simulations.record(input(UUID));
+    await repos.simulations.record(input(null));
+    const sent = calls.map(
+      (c) => (c.body as { simulation: { user_id: string | null } }).simulation,
+    );
+    expect(sent.map((x) => x.user_id)).toEqual([UUID, null]);
+  });
+
+  it('writes an activity event and reads events back with their account', async () => {
+    const row = {
+      id: UUID,
+      actor_email: 'asha@bank.test',
+      event: 'LOGIN',
+      detail: null,
+      created_at: '2026-10-08T01:02:03.456789+00:00',
+      user: { id: UUID, email: 'asha@bank.test', display_name: 'Asha Rao' },
+    };
+    const { repos, calls } = fakeDb((c) => (c.method === 'GET' ? { body: [row] } : { body: null }));
+    await repos.activity.record({
+      userId: null,
+      actorEmail: 'ghost@bank.test',
+      event: 'LOGIN_FAILED',
+      detail: { reason: 'unknown_email' },
+    });
+    expect(calls[0]).toMatchObject({
+      method: 'POST',
+      path: '/rest/v1/activity_events',
+      body: {
+        user_id: null,
+        actor_email: 'ghost@bank.test',
+        event: 'LOGIN_FAILED',
+        detail: { reason: 'unknown_email' },
+      },
+    });
+
+    expect(await repos.activity.listRecent(10)).toEqual([
+      {
+        id: UUID,
+        createdAt: '2026-10-08T01:02:03.456Z',
+        event: 'LOGIN',
+        user: { id: UUID, email: 'asha@bank.test', displayName: 'Asha Rao' },
+        actorEmail: 'asha@bank.test',
+        detail: {},
+      },
+    ]);
+    expect(calls[1]!.search.get('order')).toBe('created_at.desc');
+    expect(calls[1]!.search.get('limit')).toBe('10');
+
+    await repos.activity.listSince(SINCE, 20);
+    expect(calls[2]!.search.get('created_at')).toBe(`gte.${SINCE}`);
+  });
+
+  it('says the schema is missing when the migration has not been applied', () => {
+    const err = toRepositoryError(
+      { code: '42703', message: 'column simulations.user_id does not exist' },
+      400,
+    );
+    expect(err.kind).toBe('unavailable');
+    expect(err.message).toMatch(/apply supabase\/migrations/);
   });
 });

@@ -7,11 +7,21 @@ interface Props {
   currency: string;
   /** Column header for the level, e.g. "^NSEI level" or "USD/INR rate". */
   levelLabel: string;
+  /** Header of the payoff column. A DCD says it is the deposit-currency equivalent. */
+  payoffLabel?: string;
   compact?: boolean;
 }
 
-export function ScenarioTable({ scenarios, currency, levelLabel, compact = false }: Props) {
+export function ScenarioTable({
+  scenarios,
+  currency,
+  levelLabel,
+  payoffLabel = 'Payoff',
+  compact = false,
+}: Props) {
   const cell = compact ? 'py-1.5 px-2' : 'py-2.5 px-3';
+  // A DCD pays in the deposit or the alternate currency: show what is paid next to its equivalent.
+  const showSettlement = scenarios.some((s) => s.settlement !== undefined);
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs text-left">
@@ -24,8 +34,13 @@ export function ScenarioTable({ scenarios, currency, levelLabel, compact = false
             <th scope="col" className={cell}>
               {levelLabel}
             </th>
+            {showSettlement && (
+              <th scope="col" className={`${cell} text-right`}>
+                Paid as
+              </th>
+            )}
             <th scope="col" className={`${cell} text-right`}>
-              Payoff
+              {payoffLabel}
             </th>
             <th scope="col" className={`${cell} text-right`}>
               Return
@@ -48,6 +63,20 @@ export function ScenarioTable({ scenarios, currency, levelLabel, compact = false
                 {formatPct(s.shockPct, 0)}
               </th>
               <td className={`${cell} text-[var(--ink-secondary)]`}>{formatLevel(s.level)}</td>
+              {showSettlement && (
+                <td className={`${cell} text-right text-[var(--ink-secondary)]`}>
+                  {s.settlement ? (
+                    <>
+                      {formatMoney(s.settlement.amount, s.settlement.currency)}
+                      <span className="block text-[10px] text-[var(--ink-muted)]">
+                        {s.settlement.converted ? 'converted at strike' : 'no conversion'}
+                      </span>
+                    </>
+                  ) : (
+                    '—'
+                  )}
+                </td>
+              )}
               <td className={`${cell} text-right font-semibold`}>
                 {formatMoney(s.payoff, currency)}
               </td>

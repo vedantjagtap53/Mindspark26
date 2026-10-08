@@ -163,7 +163,7 @@ This repo only calls these. Base URL `AI_API_URL`, header `Authorization: Bearer
 
 ### `POST /forecast` (summary)
 
-- **Request:** `underlying {symbol, assetClass}`, `tenorDays` (30–1,095), `trainingWindowYears` (5 or 10), `samplePathCount` (100–2,000).
+- **Request:** `underlying {symbol, assetClass}`, `tenorDays` (30–1,095), `trainingWindowYears` (30/365 to 3 years, default 3), `samplePathCount` (100–2,000).
 - **Response:** low/base/high daily paths, end-value percentiles, fan chart series, sample paths, model info, training window, backtest.
 - The backend rejects anything that doesn't match `docs/forecasting.md` exactly.
 

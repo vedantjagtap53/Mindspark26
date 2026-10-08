@@ -1,5 +1,6 @@
 // Centralized, typed application configuration. Everything else receives an AppConfig;
 // nothing outside src/config reads process.env.
+import { randomBytes } from 'node:crypto';
 import type { RuntimeEnvironment } from '@mindspark/shared';
 import { SUPABASE_REQUIRED, parseEnv, type Env } from './env.js';
 
@@ -11,6 +12,18 @@ export interface AppConfig {
     configured: boolean;
     url?: string;
     serviceRoleKey?: string;
+  };
+  auth: {
+    /** HS256 signing secret for access tokens. */
+    jwtSecret: string;
+    /** True when no AUTH_JWT_SECRET was set: the secret is random and sessions end on restart. */
+    jwtSecretEphemeral: boolean;
+    accessTtlSeconds: number;
+    refreshTtlSeconds: number;
+    /** Anonymous requests are rejected when true. */
+    enforced: boolean;
+    payloadHashRequired: boolean;
+    cookieSecure: boolean;
   };
   ai: {
     baseUrl?: string;
@@ -33,6 +46,7 @@ export interface AppConfig {
 }
 
 export function buildConfig(env: Env): AppConfig {
+  const production = env.NODE_ENV === 'production';
   return {
     env: env.NODE_ENV,
     port: env.API_PORT,
@@ -40,6 +54,15 @@ export function buildConfig(env: Env): AppConfig {
       configured: SUPABASE_REQUIRED.every((name) => Boolean(env[name])),
       url: env.SUPABASE_URL,
       serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
+    },
+    auth: {
+      jwtSecret: env.AUTH_JWT_SECRET ?? randomBytes(32).toString('hex'),
+      jwtSecretEphemeral: env.AUTH_JWT_SECRET === undefined,
+      accessTtlSeconds: env.AUTH_ACCESS_TTL_SECONDS,
+      refreshTtlSeconds: env.AUTH_REFRESH_TTL_SECONDS,
+      enforced: env.AUTH_ENFORCED ?? production,
+      payloadHashRequired: env.PAYLOAD_HASH_REQUIRED ?? production,
+      cookieSecure: env.AUTH_COOKIE_SECURE ?? production,
     },
     ai: {
       baseUrl: env.AI_API_URL,

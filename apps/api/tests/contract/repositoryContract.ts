@@ -1,5 +1,6 @@
 // Behaviour every Repositories implementation must have. Runs against the in-memory
 // implementation and against the Supabase adapter on a local database (tests/supabase).
+import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   RepositoryError,
@@ -70,6 +71,7 @@ const shockResult: RiskResultInput = {
 const modeA = (configurationId: string): ModeASimulationInput => ({
   mode: 'A',
   configurationId,
+  userId: null,
   profileSnapshot: profileInput(),
   trainingWindowYears: 10,
   forecastMeta: { contractVersion: '1.0', model: { name: 'garch11-t-montecarlo' } },
@@ -87,6 +89,7 @@ const modeA = (configurationId: string): ModeASimulationInput => ({
 const modeB = (configurationId: string): ModeBSimulationInput => ({
   mode: 'B',
   configurationId,
+  userId: null,
   profileSnapshot: null,
   levelValue: 25_000,
   levelSource: 'manual',
@@ -182,6 +185,19 @@ export function runRepositoryContract(name: string, make: () => Promise<Reposito
 
       it('returns null for an unknown simulation', async () => {
         expect(await repos.simulations.getById(MISSING)).toBeNull();
+      });
+
+      it('lists the most recent simulations first, up to the limit', async () => {
+        const first = await repos.simulations.record(modeA(configurationId));
+        const second = await repos.simulations.record(modeB(configurationId));
+        const third = await repos.simulations.record(modeA(configurationId));
+        const two = await repos.simulations.listRecent(2);
+        expect(two.map((r) => r.id)).toEqual([third, second]);
+        const all = (await repos.simulations.listRecent(100)).map((r) => r.id);
+        expect(all).toContain(first);
+        expect(all.indexOf(third)).toBeLessThan(all.indexOf(first));
+        expect(two[0]?.mode).toBe('A');
+        expect(two[0]?.riskResults).toHaveLength(3);
       });
 
       const badInputs: Array<[string, (c: string) => SimulationInput, RepositoryErrorKind]> = [
@@ -296,6 +312,110 @@ export function runRepositoryContract(name: string, make: () => Promise<Reposito
         const rec = await repos.simulations.getById(simulationId);
         expect(rec?.explanations.map((e) => e.text)).toEqual(['first', 'second']);
         expect(rec?.explanations[0]?.sources).toEqual(['a']);
+      });
+    });
+
+    describe('runs linked to accounts', () => {
+      let configurationId: string;
+      let first: Awaited<ReturnType<Repositories['users']['create']>>;
+      let second: Awaited<ReturnType<Repositories['users']['create']>>;
+      beforeEach(async () => {
+        configurationId = await repos.productConfigurations.create(elnConfig);
+        const stamp = `${Date.now()}-${randomUUID().slice(0, 8)}`;
+        first = await repos.users.create({
+          email: `first-${stamp}@bank.test`,
+          displayName: 'First User',
+          passwordHash: 'x',
+          role: 'RM',
+        });
+        second = await repos.users.create({
+          email: `second-${stamp}@bank.test`,
+          displayName: 'Second User',
+          passwordHash: 'x',
+          role: 'RM',
+        });
+      });
+
+      it('stores the account with the run and returns it as the owner', async () => {
+        const mine = await repos.simulations.record({
+          ...modeB(configurationId),
+          userId: first.id,
+        });
+        const anonymous = await repos.simulations.record(modeB(configurationId));
+        expect(await repos.simulations.getById(mine)).toMatchObject({
+          userId: first.id,
+          owner: { id: first.id, email: first.email, displayName: 'First User' },
+        });
+        expect(await repos.simulations.getById(anonymous)).toMatchObject({
+          userId: null,
+          owner: null,
+        });
+      });
+
+      it("lists one account's runs only, newest first, and counts every run", async () => {
+        const a1 = await repos.simulations.record({ ...modeB(configurationId), userId: first.id });
+        const b1 = await repos.simulations.record({ ...modeB(configurationId), userId: second.id });
+        const a2 = await repos.simulations.record({ ...modeB(configurationId), userId: first.id });
+        expect((await repos.simulations.listByUser(first.id, 10)).map((s) => s.id)).toEqual([
+          a2,
+          a1,
+        ]);
+        expect((await repos.simulations.listByUser(second.id, 10)).map((s) => s.id)).toEqual([b1]);
+        expect(await repos.simulations.listByUser(first.id, 1)).toHaveLength(1);
+        expect(await repos.simulations.listByUser(randomUUID(), 10)).toEqual([]);
+        expect(await repos.simulations.count()).toBe(3);
+      });
+
+      it('lists only the runs saved at or after a time', async () => {
+        const before = new Date(Date.now() - 60_000).toISOString();
+        const id = await repos.simulations.record({ ...modeB(configurationId), userId: first.id });
+        expect((await repos.simulations.listSince(before, 10)).map((s) => s.id)).toEqual([id]);
+        const later = new Date(Date.now() + 3_600_000).toISOString();
+        expect(await repos.simulations.listSince(later, 10)).toEqual([]);
+      });
+
+      it('rejects a run for an account that does not exist', async () => {
+        await expectRepoError(
+          repos.simulations.record({ ...modeB(configurationId), userId: randomUUID() }),
+          'invalid_reference',
+        );
+      });
+    });
+
+    describe('activity events', () => {
+      it('records events and lists them newest first, with the account they are about', async () => {
+        const user = await repos.users.create({
+          email: `act-${Date.now()}-${randomUUID().slice(0, 8)}@bank.test`,
+          displayName: 'Active User',
+          passwordHash: 'x',
+          role: 'RM',
+        });
+        const before = new Date(Date.now() - 60_000).toISOString();
+        await repos.activity.record({
+          userId: user.id,
+          actorEmail: user.email,
+          event: 'LOGIN',
+          detail: { role: 'RM' },
+        });
+        await repos.activity.record({
+          userId: null,
+          actorEmail: 'nobody@bank.test',
+          event: 'LOGIN_FAILED',
+          detail: { reason: 'unknown_email' },
+        });
+        const events = await repos.activity.listRecent(10);
+        expect(events.slice(0, 2).map((e) => e.event)).toEqual(['LOGIN_FAILED', 'LOGIN']);
+        expect(events[0]).toMatchObject({
+          user: null,
+          actorEmail: 'nobody@bank.test',
+          detail: { reason: 'unknown_email' },
+        });
+        expect(events[1]).toMatchObject({
+          user: { id: user.id, email: user.email, displayName: 'Active User' },
+          detail: { role: 'RM' },
+        });
+        expect((await repos.activity.listSince(before, 10)).length).toBeGreaterThanOrEqual(2);
+        expect(await repos.activity.listRecent(1)).toHaveLength(1);
       });
     });
 

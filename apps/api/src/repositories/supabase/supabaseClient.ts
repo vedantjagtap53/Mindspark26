@@ -56,8 +56,14 @@ export function toRepositoryError(err: unknown, status = 0): RepositoryError {
   if (status === 401 || status === 403 || (typeof code === 'string' && /^PGRST30\d$/.test(code))) {
     return new RepositoryError('unavailable', 'Supabase rejected the service credentials');
   }
-  if (code === 'PGRST205' || code === '42P01' || code === 'PGRST202' || code === '42883') {
-    // Missing table or function: the project answered, but supabase/migrations is not applied.
+  if (
+    code === 'PGRST205' ||
+    code === '42P01' ||
+    code === 'PGRST202' ||
+    code === '42883' ||
+    code === '42703'
+  ) {
+    // Missing table, column or function: the project answered, but supabase/migrations is not applied.
     return new RepositoryError(
       'unavailable',
       `Database schema is missing; apply supabase/migrations (${message})`,

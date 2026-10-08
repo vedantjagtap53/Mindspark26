@@ -3,6 +3,7 @@ import { termIssues } from '../src/schemas/terms';
 import {
   DEFAULT_FORMS,
   DEFAULT_RUN,
+  runBlocker,
   runSettingsFor,
   simulateRequest,
   type Forms,
@@ -38,10 +39,10 @@ describe('termIssues (shared schemas)', () => {
 });
 
 describe('runSettingsFor', () => {
-  it('keeps Mode A for DCD and moves a live level to the FX reference rate', () => {
+  it('keeps Mode A for DCD and moves a live level to the strike rate', () => {
     const next = runSettingsFor('ELN', 'DCD', { ...DEFAULT_RUN, mode: 'A', levelSource: 'live' });
     expect(next.mode).toBe('A');
-    expect(next.levelSource).toBe('reference');
+    expect(next.levelSource).toBe('strike');
   });
 
   it('moves ELN/CPN off the FX reference rate to a typed level, not the live feed', () => {
@@ -53,6 +54,41 @@ describe('runSettingsFor', () => {
     const run = { ...DEFAULT_RUN, levelSource: 'manual' as const, manualLevel: 25_000 };
     expect(runSettingsFor('ELN', 'DCD', run).manualLevel).toBeNull();
     expect(runSettingsFor('ELN', 'CPN', run).manualLevel).toBe(25_000);
+  });
+
+  it('starts a DCD from the strike rate the RM entered, so Run simulation is not blocked', () => {
+    const run = runSettingsFor('ELN', 'DCD', DEFAULT_RUN);
+    expect(run.levelSource).toBe('strike');
+    expect(runBlocker('DCD', run)).toBeNull();
+    const body = simulateRequest('DCD', DEFAULT_FORMS, { ...run, shockPct: 10 });
+    expect(body).toMatchObject({
+      mode: 'B',
+      productType: 'DCD',
+      shockPct: 10,
+      level: { source: 'manual', value: DEFAULT_FORMS.DCD.strikeRate },
+    });
+  });
+
+  it('follows the strike when the RM changes it, and leaves a chosen reference rate alone', () => {
+    const forms = { ...DEFAULT_FORMS, DCD: { ...DEFAULT_FORMS.DCD, strikeRate: 86.2 } };
+    const strike = runSettingsFor('ELN', 'DCD', DEFAULT_RUN);
+    expect(simulateRequest('DCD', forms, strike)).toMatchObject({
+      level: { source: 'manual', value: 86.2 },
+    });
+    const reference = { ...DEFAULT_RUN, levelSource: 'reference' as const };
+    expect(runSettingsFor('DCD', 'DCD', reference).levelSource).toBe('reference');
+  });
+
+  it('turns the DCD-only sources into a typed level when leaving a DCD', () => {
+    const run = runSettingsFor('DCD', 'ELN', { ...DEFAULT_RUN, levelSource: 'strike' });
+    expect(run.levelSource).toBe('manual');
+  });
+
+  it('keeps an FX rate the RM already typed for a DCD', () => {
+    const typed = { ...DEFAULT_RUN, levelSource: 'manual' as const, manualLevel: 84.5 };
+    const run = runSettingsFor('DCD', 'DCD', typed);
+    expect(run.levelSource).toBe('manual');
+    expect(run.manualLevel).toBe(84.5);
   });
 });
 

@@ -23,13 +23,18 @@ export function createAdvisoryController(
 ): AdvisoryController {
   return {
     suitability: async (req, res) => {
-      res.json(await suitability.assess(suitabilityRequestSchema.parse(req.body)));
+      res.json(await suitability.assess(suitabilityRequestSchema.parse(req.body), req.auth?.userId));
     },
     explain: async (req, res) => {
-      res.json(await advisory.explain(explainRequestSchema.parse(req.body).simulationId));
+      res.json(
+        await advisory.explain(
+          explainRequestSchema.parse(req.body).simulationId,
+          req.auth?.userId,
+        ),
+      );
     },
     chat: async (req, res) => {
-      res.json(await advisory.chat(chatRequestSchema.parse(req.body)));
+      res.json(await advisory.chat(chatRequestSchema.parse(req.body), req.auth?.userId));
     },
   };
 }

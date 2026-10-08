@@ -10,7 +10,11 @@ import {
 export type ProductType = 'ELN' | 'DCD' | 'CPN';
 export type RiskAppetite = 'low' | 'medium' | 'high';
 export type Mode = 'A' | 'B';
-export type LevelSourceChoice = 'manual' | 'live' | 'reference';
+/**
+ * Where a Mode B run starts. `strike` (DCD only) starts from the strike rate the RM entered in the
+ * terms; it is sent to the API as a manual level equal to that strike.
+ */
+export type LevelSourceChoice = 'manual' | 'live' | 'reference' | 'strike';
 
 export interface ElnForm {
   symbol: string;
@@ -44,10 +48,8 @@ export interface CpnForm {
   capPct: number;
 }
 
-/** Client information is captured with each suitability assessment; profiles are not saved. */
+/** The client's suitability inputs, captured with each assessment; profiles are not saved. The RM signs in, so no client name or age is asked. */
 export interface ProfileForm {
-  name: string;
-  age: number;
   riskAppetite: RiskAppetite;
   horizonMonths: number;
   lossTolerancePct: number;
@@ -103,8 +105,6 @@ export const DEFAULT_FORMS: Forms = {
 };
 
 export const DEFAULT_PROFILE: ProfileForm = {
-  name: '',
-  age: 30,
   riskAppetite: 'medium',
   horizonMonths: 12,
   lossTolerancePct: 10,
@@ -113,8 +113,6 @@ export const DEFAULT_PROFILE: ProfileForm = {
 
 /** The client snapshot submitted with the suitability assessment. */
 export const clientProfile = (p: ProfileForm) => ({
-  name: p.name.trim(),
-  age: p.age,
   riskAppetite: p.riskAppetite,
   horizonMonths: p.horizonMonths,
   lossTolerancePct: p.lossTolerancePct,
@@ -175,13 +173,6 @@ export const configureRequest = (product: ProductType, forms: Forms) => ({
   terms: termsFor(product, forms),
 });
 
-/** Why the client is incomplete, or null when name and age are entered. Range checks stay on the server. */
-export function profileBlocker(p: ProfileForm): string | null {
-  if (p.name.trim() === '') return 'Enter the client name.';
-  if (!(p.age > 0)) return 'Enter the client age.';
-  return null;
-}
-
 /** Why a run cannot be sent yet, or null when it can. The browser only checks for missing input. */
 export function runBlocker(product: ProductType, run: RunSettings): string | null {
   const missingLevel = run.manualLevel === null || !(run.manualLevel > 0);
@@ -200,18 +191,16 @@ export function runBlocker(product: ProductType, run: RunSettings): string | nul
 export function runSettingsFor(from: ProductType, to: ProductType, run: RunSettings): RunSettings {
   const manualLevel = (from === 'DCD') === (to === 'DCD') ? run.manualLevel : null;
   if (to === 'DCD') {
-    return {
-      ...run,
-      manualLevel,
-      levelSource: run.levelSource === 'live' ? 'reference' : run.levelSource,
-    };
+    // Start from the strike rate the RM entered: a manual source with no rate typed would leave
+    // Run simulation disabled until the RM found the field. A typed rate or the reference rate
+    // that was chosen on purpose is kept.
+    const useStrike =
+      run.levelSource === 'live' || (run.levelSource === 'manual' && manualLevel === null);
+    return { ...run, manualLevel, levelSource: useStrike ? 'strike' : run.levelSource };
   }
   // Manual, not live: the live feed needs an Upstox token and may not be configured.
-  return {
-    ...run,
-    manualLevel,
-    levelSource: run.levelSource === 'reference' ? 'manual' : run.levelSource,
-  };
+  const fxOnly = run.levelSource === 'reference' || run.levelSource === 'strike';
+  return { ...run, manualLevel, levelSource: fxOnly ? 'manual' : run.levelSource };
 }
 
 export function simulateRequest(product: ProductType, forms: Forms, run: RunSettings) {
@@ -221,8 +210,10 @@ export function simulateRequest(product: ProductType, forms: Forms, run: RunSett
     return { mode: 'A', productType: product, terms, trainingWindowYears };
   }
   const level =
-    run.levelSource === 'manual'
-      ? { source: 'manual', value: run.manualLevel }
-      : { source: run.levelSource };
+    run.levelSource === 'strike'
+      ? { source: 'manual', value: forms.DCD.strikeRate }
+      : run.levelSource === 'manual'
+        ? { source: 'manual', value: run.manualLevel }
+        : { source: run.levelSource };
   return { mode: 'B', productType: product, terms, shockPct: run.shockPct, level };
 }

@@ -5,7 +5,6 @@
 import { randomUUID } from 'node:crypto';
 import {
   DEFAULT_SAMPLE_PATH_COUNT,
-  fxForecastSymbol,
   tenorToTradingDays,
   type UnderlyingAssetClass,
   PAYOFF_CURVE_SHOCKS,
@@ -17,6 +16,7 @@ import {
   type ShockOutcome,
   type ModeACaseResult,
   type SimulateModeARequest,
+  type SimulateModeAContextResponse,
   type SimulateModeAResponse,
   type SimulateModeBRequest,
   type SimulateModeBResponse,
@@ -41,8 +41,12 @@ import {
 import type { SimulationRecords } from './simulationRecords.js';
 
 export interface SimulateService {
-  simulateModeA(request: SimulateModeARequest): Promise<SimulateModeAResponse>;
-  simulateModeB(request: SimulateModeBRequest): Promise<SimulateModeBResponse>;
+  /** `ownerId` is the signed-in account; the run is then usable only by that account. */
+  simulateModeA(
+    request: SimulateModeARequest,
+    ownerId?: string,
+  ): Promise<SimulateModeAResponse | SimulateModeAContextResponse>;
+  simulateModeB(request: SimulateModeBRequest, ownerId?: string): Promise<SimulateModeBResponse>;
 }
 
 export interface SimulateDeps {
@@ -90,6 +94,12 @@ type ProductInput =
   | { productType: 'DCD'; terms: DcdTerms }
   | { productType: 'CPN'; terms: CpnTerms };
 
+/** What a DCD actually pays, from the DCD engine's own result (never recomputed here). */
+function dcdSettlement(details: Details): NonNullable<ShockOutcome['settlement']> {
+  const d = details as { settlementAmount: number; settlementCurrency: string; converted: boolean };
+  return { amount: d.settlementAmount, currency: d.settlementCurrency, converted: d.converted };
+}
+
 /**
  * Payoff at maturity for each shock from `startLevel`: the chart curve, the PRD scenario table and
  * the breakevens. Shared by Mode B (starting level from market data or the RM) and Mode A (the
@@ -105,6 +115,8 @@ function shockTable(request: ProductInput, startLevel: number) {
       returnPct: o.returnPct,
       lossAmount: o.lossAmount,
       knockedIn: o.knockedIn,
+      // A DCD pays in one of two currencies; `payoff` is its deposit-currency equivalent.
+      ...(request.productType === 'DCD' ? { settlement: dcdSettlement(o.details) } : {}),
     };
   };
   const breakevens: BreakevenPoint[] = findBreakevenShocks(
@@ -155,14 +167,26 @@ function modeBOutcome(request: ProductInput, startLevel: number, shockPct: numbe
   return { shockedLevel, payoff, knockedIn, details, ...outcomeMetrics(invested, payoff) };
 }
 
-/** What Mode A forecasts: the underlying (ELN, CPN) or the FX pair (DCD). */
+/** The only underlying the forecast service has data for. */
+const NIFTY_50: { symbol: string; assetClass: UnderlyingAssetClass; name: string } = {
+  symbol: '^NSEI',
+  assetClass: 'index',
+  name: 'Nifty 50',
+};
+
+const DCD_CONTEXT_NOTICE =
+  'Nifty 50 forecast, shown for context only. A DCD pays on the USD/INR rate, not on the Nifty 50, so no DCD payoff, risk or suitability verdict is calculated from this forecast. Use Mode B (FX shock) for the DCD payoff.';
+
+/**
+ * What Mode A forecasts: the underlying (ELN, CPN). For a DCD the forecast service has no FX data,
+ * so it forecasts the Nifty 50 and the result is context only (see SimulateModeAContextResponse).
+ */
 function forecastUnderlying(request: SimulateModeARequest): {
   symbol: string;
   assetClass: UnderlyingAssetClass;
 } {
   if (request.productType === 'DCD') {
-    const t = request.terms;
-    return { symbol: fxForecastSymbol(t.depositCurrency, t.alternateCurrency), assetClass: 'fx' };
+    return { symbol: NIFTY_50.symbol, assetClass: NIFTY_50.assetClass };
   }
   return request.terms.underlying;
 }
@@ -184,7 +208,7 @@ function caseResult(c: ModeACase<EngineOutcome>, invested: number): ModeACaseRes
 
 export function createSimulateService(deps: SimulateDeps): SimulateService {
   return {
-    async simulateModeA(request) {
+    async simulateModeA(request, ownerId) {
       if (!deps.forecast) {
         throw new AppError('AI_UNAVAILABLE', 'The forecast service is not configured: use Mode B');
       }
@@ -208,6 +232,30 @@ export function createSimulateService(deps: SimulateDeps): SimulateService {
           throw new AppError(err.code, err.message, err.details.length ? err.details : undefined);
         }
         throw err;
+      }
+
+      if (request.productType === 'DCD') {
+        // Context only: nothing is evaluated, stored or sent to the AI.
+        const context: SimulateModeAContextResponse = {
+          kind: 'forecast_context',
+          mode: 'A',
+          productType: 'DCD',
+          underlying: { symbol: NIFTY_50.symbol, name: NIFTY_50.name },
+          spot: { value: forecast.data.spot, asOf: forecast.data.asOf },
+          horizon: forecast.horizon,
+          fan: forecast.fan,
+          model: {
+            ...forecast.model,
+            trainingWindowYears: request.trainingWindowYears,
+            trainingStart: forecast.data.trainingStart,
+            trainingEnd: forecast.data.trainingEnd,
+            observations: forecast.data.observations,
+          },
+          backtest: forecast.backtest,
+          history: await history.match(forecast.data.spot, forecast.data.asOf),
+          notice: DCD_CONTEXT_NOTICE,
+        };
+        return context;
       }
 
       const evaluate = modeAEvaluator(request);
@@ -240,6 +288,7 @@ export function createSimulateService(deps: SimulateDeps): SimulateService {
       deps.records?.save({
         id: response.simulationId,
         createdAt: Date.now(),
+        ownerId,
         request,
         response,
         forecastMeta: forecastRecordMetadata(forecast),
@@ -247,7 +296,7 @@ export function createSimulateService(deps: SimulateDeps): SimulateService {
       return response;
     },
 
-    async simulateModeB(request) {
+    async simulateModeB(request, ownerId) {
       const level = await deps.marketData.resolveLevel(request);
       const main = modeBOutcome(request, level.value, request.shockPct);
       const table = shockTable(request, level.value);
@@ -269,6 +318,7 @@ export function createSimulateService(deps: SimulateDeps): SimulateService {
       deps.records?.save({
         id: response.simulationId,
         createdAt: Date.now(),
+        ownerId,
         request,
         response,
       });

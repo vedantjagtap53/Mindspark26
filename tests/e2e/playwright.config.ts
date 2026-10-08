@@ -17,6 +17,8 @@ const root = resolve(import.meta.dirname, '../..');
 const apiEnv: Record<string, string> = {
   NODE_ENV: 'test',
   API_PORT: String(API),
+  // These journeys test the simulator, not sign-in; a developer's .env may enforce it.
+  AUTH_ENFORCED: 'false',
   AI_API_URL: `http://127.0.0.1:${STUB}/v1`,
   AI_API_KEY: 'e2e',
   RAG_API_URL: `http://127.0.0.1:${STUB}/rag`,

@@ -8,6 +8,7 @@
     "build": "node scripts/build.mjs",
     "start": "node dist/server.js",
     "start:tsx": "tsx src/server.ts",
+    "seed:admin": "tsx src/cli/seedAdmin.ts",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },

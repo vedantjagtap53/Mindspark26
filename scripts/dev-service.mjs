@@ -24,6 +24,8 @@ const SERVICES = {
     key: { from: 'RAG_API_KEY', as: 'SERVICE_API_KEY' },
   },
   'rag-index': { dir: 'rag', args: ['-m', 'rag.kb.build', '--rebuild'] },
+  // One-off data refresh: appends new Nifty 50 closes to services/forecast/data/nifty50_clean.csv.
+  'forecast-refresh': { dir: 'forecast', args: ['-m', 'forecast_service.refresh'] },
 };
 
 const name = process.argv[2];
@@ -56,3 +58,31 @@ if (service.key) {
 
 const child = spawn(python, service.args, { cwd: dir, env, stdio: 'inherit' });
 child.on('exit', (code) => process.exit(code ?? 0));
+
+// Keeps the forecast data fresh while the service runs. The service reloads the CSV when it changes,
+// so no restart is needed. forecast_service.refresh is idempotent and writes only validated real
+// candles (see its docstring); a failed run (e.g. Yahoo unreachable) is logged, retried at the next
+// interval and never stops the service, which fails closed with DATA_STALE once the data is old.
+// FORECAST_AUTO_REFRESH=off disables this; REFRESH_INTERVAL_HOURS sets the interval (default 6).
+if (name === 'forecast' && process.env.FORECAST_AUTO_REFRESH !== 'off') {
+  const hours =
+    Number(process.env.REFRESH_INTERVAL_HOURS) > 0 ? Number(process.env.REFRESH_INTERVAL_HOURS) : 6;
+  let running = false;
+  const refreshOnce = () => {
+    if (running) return;
+    running = true;
+    const p = spawn(python, ['-m', 'forecast_service.refresh'], {
+      cwd: dir,
+      env,
+      stdio: 'inherit',
+    });
+    const done = (note) => {
+      running = false;
+      if (note) console.error(`[refresh] ${note}; will retry in ${hours}h`);
+    };
+    p.on('error', (err) => done(`could not start (${err.message})`));
+    p.on('exit', (code) => done(code ? `failed (exit ${code})` : ''));
+  };
+  refreshOnce();
+  setInterval(refreshOnce, hours * 3_600_000);
+}

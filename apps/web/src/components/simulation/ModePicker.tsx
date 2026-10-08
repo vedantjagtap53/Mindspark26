@@ -20,8 +20,8 @@ interface Props {
   run: RunSettings;
   onRun: (r: RunSettings) => void;
   termIssueCount: number;
-  /** Why the client profile is incomplete (name, age), or null. */
-  profileIssue: string | null;
+  /** DCD: the strike rate from the terms, the starting rate of a "My strike rate" run. */
+  strikeRate: number;
   loading: boolean;
   elapsedSeconds: number;
   onExecute: () => void;
@@ -32,7 +32,7 @@ export function ModePicker({
   run,
   onRun,
   termIssueCount,
-  profileIssue,
+  strikeRate,
   loading,
   elapsedSeconds,
   onExecute,
@@ -44,9 +44,10 @@ export function ModePicker({
   const blocker =
     termIssueCount > 0
       ? 'Fix the highlighted product terms first (stage 2).'
-      : (profileIssue ?? runBlocker(product, run));
+      : runBlocker(product, run);
   const levelOptions: Array<{ value: LevelSourceChoice; label: string }> = isDcd
     ? [
+        { value: 'strike', label: 'My strike rate' },
         { value: 'reference', label: 'FX reference rate' },
         { value: 'manual', label: 'Enter FX spot' },
       ]
@@ -115,9 +116,9 @@ export function ModePicker({
             </div>
           </div>
           <div className="p-3.5 rounded-xl clay-tile-light border border-[var(--border-subtle)] text-[11px] text-[var(--ink-muted)] leading-relaxed">
-            The forecast service returns low (P5), base (P50) and high (P95) paths plus 500 sample
-            paths. If it is down or its answer fails validation, the run fails: no substitute
-            forecast is generated.
+            {isDcd
+              ? 'The forecast service has no USD/INR data, so for a DCD Mode A shows its Nifty 50 forecast as context only. No DCD payoff or verdict is calculated from it: use Mode B (FX shock) for those. If the service is down, the run fails.'
+              : 'The forecast service returns low (P5), base (P50) and high (P95) paths plus 500 sample paths. If it is down or its answer fails validation, the run fails: no substitute forecast is generated.'}
           </div>
         </div>
       ) : (
@@ -186,6 +187,11 @@ export function ModePicker({
                   placeholder={isDcd ? 'e.g. 84.20' : 'e.g. 25000'}
                 />
               </Field>
+            ) : isDcd && run.levelSource === 'strike' ? (
+              <p className="text-[11px] text-[var(--ink-muted)] leading-relaxed">
+                Starts from the strike rate you entered in the terms ({strikeRate}), so a 0% shock
+                ends exactly at the strike. Reported as a manual level, not market data.
+              </p>
             ) : isDcd ? (
               <p className="text-[11px] text-[var(--ink-muted)] leading-relaxed">
                 Latest daily FX reference rate (Frankfurter). Indicative, not live; rejected if too

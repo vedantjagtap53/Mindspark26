@@ -17,6 +17,7 @@ import {
   type SimulationInput,
 } from '../../repositories/interfaces/index.js';
 import { AppError } from '../../utils/errors.js';
+import type { ActivityLog } from '../activity/activityLog.js';
 import type { SimulationRecord } from '../simulation/simulationRecords.js';
 
 /** Bump when the suitability rules (docs/suitability-rules.md) change; stored with each verdict. */
@@ -125,7 +126,8 @@ function simulationInput(
   configurationId: string,
   profile: ClientProfile,
 ): SimulationInput {
-  const base = { configurationId, profileSnapshot: profile };
+  // The saved run belongs to the account that ran it (null in development without sign-in).
+  const base = { configurationId, userId: record.ownerId ?? null, profileSnapshot: profile };
   const results = riskResults(record);
   const r = record.response;
   if (r.mode === 'A') {
@@ -154,7 +156,10 @@ function simulationInput(
   };
 }
 
-export function createPersistenceService(repositories?: Repositories): PersistenceService {
+export function createPersistenceService(
+  repositories?: Repositories,
+  activity?: ActivityLog,
+): PersistenceService {
   return {
     enabled: repositories !== undefined,
 
@@ -176,6 +181,17 @@ export function createPersistenceService(repositories?: Repositories): Persisten
             reason: f.message,
           })),
           rulesVersion: SUITABILITY_RULES_VERSION,
+        });
+        await activity?.record({
+          userId: record.ownerId ?? null,
+          actorEmail: null,
+          event: 'RUN_SAVED',
+          detail: {
+            simulationId,
+            product: record.request.productType,
+            mode: record.response.mode,
+            verdict: suitability.verdict,
+          },
         });
         return { configurationId, simulationId };
       } catch (err) {

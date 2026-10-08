@@ -18,7 +18,7 @@ Inputs: product risk metrics from the payoff and risk engine, plus the client pr
 
 - **Verdict mapping:** any hard flag gives **Not suitable**. Otherwise, any other flag gives **Caution**. No flags gives **Suitable**. Every raised flag is listed as a reason, whatever the verdict.
 - **Product risk ratings (fixed):** CPN **Low**, DCD **High**, ELN **High**.
-- **Client details:** the RM enters the client for each run (decided 2026-10-04: no saved profiles). **Name and age are display-only**: no rule reads them, so the verdict is identical whatever they are; they are stored with the audit record and never sent to the AI service.
+- **Client details:** the RM enters the client's suitability inputs for each run (decided 2026-10-04: no saved profiles). Since 2026-10-08 no client name or age is asked; the API still accepts them as optional, **display-only** fields: no rule reads them, so the verdict is identical whatever they are; if sent they are stored with the audit record and never sent to the AI service.
 
 ## Decisions (Karan, 2026-10-04) — implemented in `apps/api/src/engines/suitability/`
 

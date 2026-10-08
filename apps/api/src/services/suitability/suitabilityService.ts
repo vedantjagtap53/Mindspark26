@@ -12,7 +12,8 @@ import type { PersistenceService } from '../persistence/persistenceService.js';
 import type { SimulationRecord, SimulationRecords } from '../simulation/simulationRecords.js';
 
 export interface SuitabilityService {
-  assess(request: SuitabilityRequest): Promise<SuitabilityResponse>;
+  /** `ownerId` is the signed-in account: another account's run is reported as not found. */
+  assess(request: SuitabilityRequest, ownerId?: string): Promise<SuitabilityResponse>;
 }
 
 const shockLabel = (pct: number) => `${pct > 0 ? '+' : ''}${pct}% shock`;
@@ -64,8 +65,8 @@ export function createSuitabilityService(deps: {
   concentrationLimitPct: number;
 }): SuitabilityService {
   return {
-    async assess({ simulationId, profile }) {
-      const record = deps.records.get(simulationId);
+    async assess({ simulationId, profile }, ownerId) {
+      const record = deps.records.get(simulationId, ownerId);
       const { low, base } = lowAndBaseCases(record);
       const { verdict, flags } = assessSuitability({
         productType: record.request.productType,

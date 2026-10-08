@@ -8,7 +8,7 @@ export const TENOR_DAYS_MAX = 1095;
 export const TRADING_DAYS_PER_YEAR = 252;
 export const CALENDAR_DAYS_PER_YEAR = 365;
 
-/** Training window chosen by the RM (requested 2026-10-04): 30 days to 3 years, sent as years. */
+/** Training window the RM picks (PRD.md §7.1, §7.3): 30 days to 3 years, sent to the forecast as years. */
 export const TRAINING_WINDOW_DAYS_MIN = 30;
 export const TRAINING_WINDOW_DAYS_MAX = 1095;
 export const TRAINING_WINDOW_YEARS_MIN = TRAINING_WINDOW_DAYS_MIN / CALENDAR_DAYS_PER_YEAR;

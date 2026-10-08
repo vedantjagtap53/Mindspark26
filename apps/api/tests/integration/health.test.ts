@@ -28,6 +28,7 @@ describe('GET /api/health', () => {
         NODE_ENV: 'production',
         SUPABASE_URL: 'https://proj.supabase.co',
         SUPABASE_SERVICE_ROLE_KEY: 'k',
+        AUTH_JWT_SECRET: 's'.repeat(32),
       }),
     ).get('/api/health');
     expect(healthBody(res).environment).toBe('production');

@@ -1,5 +1,5 @@
 import type { ChatResponse, ExplainResponse, SuitabilityResponse } from '@mindspark/shared';
-import type { ApiRequestError, SimulateResponse } from '../api/client';
+import type { ApiRequestError, SimulateRunResponse } from '../api/client';
 import type { ProductType, ProfileForm, RunSettings } from '../state/forms';
 
 export interface ChatMessage {
@@ -22,7 +22,7 @@ export interface SessionRun {
   run: RunSettings;
   /** The `terms` exactly as sent to /api/simulate. */
   terms: Record<string, unknown>;
-  response: SimulateResponse;
+  response: SimulateRunResponse;
   /** The backend's verdict for `profile`, or why it could not be computed. */
   suitability?: SuitabilityResponse;
   suitabilityError?: ApiRequestError;

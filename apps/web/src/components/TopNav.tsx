@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import {
   BarChart3,
   Compass,
@@ -28,6 +29,8 @@ interface Props {
   onPrint?: () => void;
   loading: boolean;
   elapsedSeconds: number;
+  /** Account controls at the right end of the bar. */
+  trailing?: ReactNode;
 }
 
 export function TopNav({
@@ -38,6 +41,7 @@ export function TopNav({
   onPrint,
   loading,
   elapsedSeconds,
+  trailing,
 }: Props) {
   return (
     <header className="no-print sticky top-0 z-20 border-b border-[var(--border-color)] bg-[var(--canvas-bg)]/95 backdrop-blur">
@@ -97,6 +101,7 @@ export function TopNav({
           >
             <Printer className="w-3.5 h-3.5" aria-hidden />
           </button>
+          {trailing}
         </div>
       </div>
     </header>

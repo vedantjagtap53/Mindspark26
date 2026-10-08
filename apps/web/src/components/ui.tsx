@@ -97,21 +97,29 @@ export function TextInput({
   onChange,
   placeholder,
   maxLength,
+  type = 'text',
+  autoComplete,
+  required,
 }: {
   id: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   maxLength?: number;
+  type?: 'text' | 'email' | 'password';
+  autoComplete?: string;
+  required?: boolean;
 }) {
   return (
     <input
       id={id}
-      type="text"
+      type={type}
       className={inputClass}
       value={value}
       placeholder={placeholder}
       maxLength={maxLength}
+      autoComplete={autoComplete}
+      required={required}
       onChange={(e) => onChange(e.target.value)}
     />
   );

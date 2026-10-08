@@ -27,6 +27,7 @@ Source of truth: `supabase/migrations/`. Every schema change is a new, timestamp
 | `level_source`        | `LIVE`, `MANUAL`, `REFERENCE`         |
 | `scenario_case`       | `LOW`, `BASE`, `HIGH`, `SHOCK`        |
 | `suitability_verdict` | `SUITABLE`, `CAUTION`, `NOT_SUITABLE` |
+| `user_role`           | `RM`, `ADMIN`                         |
 
 ## Tables
 
@@ -45,6 +46,10 @@ Indexes: `configuration_id`.
 **`suitability_results`**: `id` (uuid, PK), `simulation_id` (FK, unique: one verdict per simulation), `verdict`, `flags` (jsonb: rule, severity, reason for every raised flag), `rules_version` (varchar 32), `created_at`.
 
 **`explanations`**: `id` (uuid, PK), `simulation_id` (FK), `text`, `model` (varchar 120), `sources` (jsonb, null), `created_at`. Index (`simulation_id`, `created_at`).
+
+**`app_users`** (migration `20261007100000_auth_users.sql`, approved 2026-10-07): `id` (uuid, PK), `email` (varchar 254; unique on `lower(email)`), `display_name` (varchar 80), `password_hash` (text; salted scrypt, never plain text), `role` (`user_role`, default `RM`), `active` (boolean), `settings` (jsonb: `theme`, `customCursor`), `created_at`, `updated_at` (trigger), `last_login_at`. Not audit evidence: users are deactivated, not deleted.
+
+**`refresh_tokens`**: `id` (uuid, PK), `user_id` (FK → app_users, `ON DELETE CASCADE`), `family_id` (uuid; one per sign-in), `token_hash` (char 64, unique; SHA-256 of the cookie value, the token itself is never stored), `expires_at`, `revoked_at`, `replaced_by` (FK → refresh_tokens; set on rotation), `created_at`. Indexes: `user_id`, `family_id`. Both tables have RLS on with no policies, like the others.
 
 ## Functions
 
@@ -97,3 +102,11 @@ SUPABASE_TEST_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
 The browser tests (`npm run test:e2e`) write to that database when `SUPABASE_TEST_URL` and `SUPABASE_TEST_SERVICE_ROLE_KEY` are set; otherwise the API runs with no database.
 
 **Still needed for production:** a Supabase project, `npx supabase db push` to apply the migration, and `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` on the API host.
+
+## Runs linked to accounts, and the activity log (2026-10-08)
+
+Migration `supabase/migrations/20261008100000_accounts_runs_activity.sql`:
+
+- `user_role` is replaced by `RM`, `ADMIN`; accounts that had `COMPLIANCE` became `RM`.
+- `simulations.user_id` (uuid, nullable, `references app_users(id) on delete restrict`, indexed with `created_at`): the account that ran the simulation. Written by `record_simulation`. Rows saved before the migration, or without a signed-in user, keep it null. Simulations stay append-only.
+- `activity_events` (`id`, `user_id` nullable `on delete set null`, `actor_email`, `event` checked against the event names, `detail` jsonb, `created_at`; indexed by time and by user). Written by the API after sign-ups, sign-ins, sign-outs, account changes and saved runs; read by the admin only. RLS on, no policies, no access for `anon` or `authenticated`.

@@ -1,15 +1,22 @@
+import type { ReactNode } from 'react';
 import { ArrowRight, ShieldCheck, Activity, BarChart3, LineChart, Target, Zap } from 'lucide-react';
-import { CustomCursor } from '../components/CustomCursor';
 
 interface Props {
-  onStart: () => void;
+  /** Opens the simulator without an account. Offered only while sign-in is not enforced. */
+  onStart?: () => void;
+  /** Opens the sign-in page. With `onRegister`, the home page offers accounts instead of a launch button. */
+  onLogin?: () => void;
+  /** Opens the create-account page. */
+  onRegister?: () => void;
+  /** Account controls (user menu) shown next to the buttons. */
+  userSlot?: ReactNode;
 }
 
-export function LandingPage({ onStart }: Props) {
+export function LandingPage({ onStart, onLogin, onRegister, userSlot }: Props) {
+  const accounts = Boolean(onLogin && onRegister);
   return (
     <div className="min-h-screen bg-[var(--canvas-bg)] text-[var(--canvas-text)] font-sans flex flex-col selection:bg-[var(--accent-primary)] selection:text-white">
-      <CustomCursor />
-      
+
       {/* Navbar */}
       <header className="px-6 py-4 border-b border-[var(--border-subtle)] bg-[var(--canvas-bg)]/80 backdrop-blur-md sticky top-0 z-50 flex justify-between items-center">
         <div className="flex items-center gap-2">
@@ -17,12 +24,32 @@ export function LandingPage({ onStart }: Props) {
             <h1 className="font-serif text-xl font-bold tracking-tight text-[var(--ink-primary)]">FinStrukt</h1>
           </div>
         </div>
-        <button 
-          onClick={onStart}
-          className="px-4 py-2 text-sm font-semibold text-white bg-[var(--accent-primary)] hover:opacity-90 rounded-full transition-all flex items-center gap-2 shadow-lg"
-        >
-          Launch Simulator <ArrowRight className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-3">
+          {userSlot}
+          {accounts ? (
+            <>
+              <button
+                onClick={onLogin}
+                className="px-4 py-2 text-sm font-semibold text-[var(--ink-primary)] border border-[var(--border-strong)] hover:bg-[var(--well-bg)] rounded-full transition-all"
+              >
+                Log in
+              </button>
+              <button
+                onClick={onRegister}
+                className="px-4 py-2 text-sm font-semibold text-white bg-[var(--accent-primary)] hover:opacity-90 rounded-full transition-all flex items-center gap-2 shadow-lg"
+              >
+                Create account <ArrowRight className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={onStart}
+              className="px-4 py-2 text-sm font-semibold text-white bg-[var(--accent-primary)] hover:opacity-90 rounded-full transition-all flex items-center gap-2 shadow-lg"
+            >
+              Launch Simulator <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </header>
 
       <main className="flex-1 flex flex-col">
@@ -43,13 +70,38 @@ export function LandingPage({ onStart }: Props) {
             </p>
             
             <div className="pt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <button 
-                onClick={onStart}
-                className="px-8 py-4 text-lg font-bold text-white bg-[var(--accent-primary)] hover:scale-105 rounded-full transition-transform shadow-xl shadow-black/10 flex items-center gap-3"
-              >
-                Start New Mandate <ArrowRight className="w-5 h-5" />
-              </button>
+              {accounts ? (
+                <>
+                  <button
+                    onClick={onLogin}
+                    className="px-8 py-4 text-lg font-bold text-white bg-[var(--accent-primary)] hover:scale-105 rounded-full transition-transform shadow-xl shadow-black/10 flex items-center gap-3"
+                  >
+                    Log in <ArrowRight className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={onRegister}
+                    className="px-8 py-4 text-lg font-bold text-[var(--ink-primary)] border border-[var(--border-strong)] hover:bg-[var(--well-bg)] rounded-full transition-colors"
+                  >
+                    Create account
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={onStart}
+                  className="px-8 py-4 text-lg font-bold text-white bg-[var(--accent-primary)] hover:scale-105 rounded-full transition-transform shadow-xl shadow-black/10 flex items-center gap-3"
+                >
+                  Start New Mandate <ArrowRight className="w-5 h-5" />
+                </button>
+              )}
             </div>
+            {accounts && onStart && (
+              <p className="text-sm text-[var(--ink-muted)]">
+                Sign-in is not enforced on this server.{' '}
+                <button onClick={onStart} className="font-semibold underline underline-offset-2">
+                  Continue without an account
+                </button>
+              </p>
+            )}
           </div>
         </section>
 

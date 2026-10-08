@@ -13,8 +13,10 @@
   "scripts": {
     "setup": "node scripts/setup.mjs",
     "dev:api": "npm run dev --workspace @mindspark/api",
+    "seed:admin": "npm run seed:admin --workspace @mindspark/api",
     "dev:web": "npm run dev --workspace @mindspark/web",
     "dev:forecast": "node scripts/dev-service.mjs forecast",
+    "refresh:forecast": "node scripts/dev-service.mjs forecast-refresh",
     "dev:rag": "node scripts/dev-service.mjs rag",
     "rag:index": "node scripts/dev-service.mjs rag-index",
     "build:web": "npm run build --workspace @mindspark/web",

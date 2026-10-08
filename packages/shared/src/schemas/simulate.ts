@@ -105,10 +105,17 @@ export interface BreakevenPoint {
 export interface ShockOutcome {
   shockPct: number;
   level: number;
+  /** In the invested currency. For a DCD this is the deposit-currency equivalent of what is paid. */
   payoff: number;
   returnPct: number;
   lossAmount: number;
   knockedIn: boolean | null;
+  /**
+   * DCD only: what is actually paid. In the deposit currency when the rate ends at or below the
+   * strike, otherwise the alternate-currency amount converted at the strike (`converted`). `payoff`
+   * is that amount expressed back in the deposit currency at the shocked rate.
+   */
+  settlement?: { amount: number; currency: string; converted: boolean };
 }
 
 /** −50% … +50% in 5% steps. */
@@ -202,6 +209,27 @@ export interface SimulateModeAResponse {
   scenarios: ShockOutcome[];
   breakevens: BreakevenPoint[];
   /** Recent daily closes for the fan chart, or why they are not shown. Display only. */
+  history: PriceHistory;
+  notice: string;
+}
+
+/**
+ * A DCD in Mode A (decided 2026-10-04). The forecast service has no FX data, so the backend asks it
+ * for the Nifty 50 and returns that forecast as context only: no DCD payoff, risk or suitability
+ * verdict is calculated from it (a DCD pays on USD/INR, not on the Nifty 50), and the run is not
+ * stored for /suitability, /explain or /chat. The DCD payoff stays in Mode B.
+ */
+export interface SimulateModeAContextResponse {
+  kind: 'forecast_context';
+  mode: 'A';
+  productType: 'DCD';
+  /** What was forecast: not the FX pair. */
+  underlying: { symbol: string; name: string };
+  spot: SimulateModeAResponse['spot'];
+  horizon: SimulateModeAResponse['horizon'];
+  fan: SimulateModeAResponse['fan'];
+  model: SimulateModeAResponse['model'];
+  backtest: SimulateModeAResponse['backtest'];
   history: PriceHistory;
   notice: string;
 }

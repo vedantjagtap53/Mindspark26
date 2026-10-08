@@ -1,7 +1,8 @@
 // Runs /api/simulate, then /api/suitability for the same run, and keeps this session's results.
 // A failed run leaves no result behind: the error is shown as-is and nothing is substituted.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ApiRequestError } from '../api/client';
+import type { SimulateModeAContextResponse } from '@mindspark/shared';
+import { ApiRequestError, isForecastContext } from '../api/client';
 import { assessSuitability, simulate } from '../services/simulation';
 import {
   termsFor,
@@ -31,6 +32,8 @@ export function useSimulation() {
   const [loading, setLoading] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [error, setError] = useState<ApiRequestError | null>(null);
+  /** DCD Mode A: the Nifty 50 forecast, shown as context. Not a run: no verdict, not in the session. */
+  const [context, setContext] = useState<SimulateModeAContextResponse | null>(null);
   const timer = useRef<number | null>(null);
   const seq = useRef(0);
 
@@ -50,6 +53,7 @@ export function useSimulation() {
     async (product: ProductType, forms: Forms, settings: RunSettings, profile: ProfileForm) => {
       setLoading(true);
       setError(null);
+      setContext(null);
       setElapsedSeconds(0);
       const start = performance.now();
       stopTimer();
@@ -59,6 +63,10 @@ export function useSimulation() {
       );
       try {
         const response = await simulate(product, forms, settings);
+        if (isForecastContext(response)) {
+          setContext(response);
+          return true;
+        }
         seq.current += 1;
         const record: SessionRun = {
           id: `run-${seq.current}`,
@@ -92,6 +100,8 @@ export function useSimulation() {
   );
 
   const clearError = useCallback(() => setError(null), []);
+  /** The context describes one set of inputs: drop it as soon as the product, terms or settings change. */
+  const clearContext = useCallback(() => setContext(null), []);
   const current = runs.find((r) => r.id === currentId) ?? null;
 
   return {
@@ -103,6 +113,8 @@ export function useSimulation() {
     elapsedSeconds,
     error,
     clearError,
+    clearContext,
+    context,
     run,
   };
 }

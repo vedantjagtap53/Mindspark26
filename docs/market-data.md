@@ -17,7 +17,7 @@ Source: `PRD.md` §7.2 and §7.3.
 
 ## Training window (agreed for Mode A)
 
-- The RM picks the training window, **30 days to 3 years** (default 3 years; it was 10 years, optional 5, until 2026-10-04: see `forecasting.md`). Crash periods are never removed from the window, but a short window may not include the COVID era.
+- The RM picks the training window, **30 days to 3 years** (default 3 years; `PRD.md` §7.3, see `forecasting.md`). Crash periods are never removed from the window, but a short window may not include the COVID era.
 - Single stocks with major corporate events may use 3–5 years.
 
 ## Providers in use (2026-10-04)

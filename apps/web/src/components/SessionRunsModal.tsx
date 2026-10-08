@@ -1,17 +1,23 @@
 // Runs from this browser session (prototype: "Saved Simulations & Audit Archive"). The audit record
 // is the backend's job (/api/suitability saves the simulation); until then nothing here is persisted.
 import { useEffect, useState } from 'react';
-import { ArrowRight, History, Printer, X } from 'lucide-react';
+import { ArrowRight, Columns3, History, Printer, X } from 'lucide-react';
 import type { SessionRun } from '../types/session';
 import { formatMoney, formatPct } from '../utils/format';
 import { currencyOf, investedOf, modeLabel, underlyingLabel } from '../utils/run';
+import { SavedRunsPanel } from './runs/SavedRunsPanel';
+import { COMPARE_MAX, COMPARE_MIN } from './simulation/CompareRuns';
 import { RunSummary } from './simulation/RunSummary';
-import { Placeholder } from './ui';
+import { Placeholder, Segmented } from './ui';
 
 interface Props {
   runs: SessionRun[];
+  /** Signed in: also offer the runs saved to the account. */
+  savedRuns?: boolean;
   onLoad: (run: SessionRun) => void;
   onPrint: (run: SessionRun) => void;
+  /** Opens the picked runs side by side, in the order they were picked. */
+  onCompare: (runs: SessionRun[]) => void;
   onClose: () => void;
 }
 
@@ -22,9 +28,26 @@ function headline(run: SessionRun): string {
     : formatPct(r.result.returnPct);
 }
 
-export function SessionRunsModal({ runs, onLoad, onPrint, onClose }: Props) {
+export function SessionRunsModal({
+  runs,
+  savedRuns = false,
+  onLoad,
+  onPrint,
+  onCompare,
+  onClose,
+}: Props) {
+  const [tab, setTab] = useState<'session' | 'saved'>('session');
   const [selectedId, setSelectedId] = useState<string | null>(runs[0]?.id ?? null);
   const selected = runs.find((r) => r.id === selectedId) ?? null;
+  /** Runs ticked for comparison, in the order they were ticked. */
+  const [picked, setPicked] = useState<string[]>([]);
+  const togglePicked = (id: string) =>
+    setPicked((p) =>
+      p.includes(id) ? p.filter((x) => x !== id) : p.length < COMPARE_MAX ? [...p, id] : p,
+    );
+  const pickedRuns = picked
+    .map((id) => runs.find((r) => r.id === id))
+    .filter((r): r is SessionRun => r !== undefined);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -54,13 +77,26 @@ export function SessionRunsModal({ runs, onLoad, onPrint, onClose }: Props) {
             </div>
             <div>
               <span id="runs-title" className="font-serif text-base font-bold">
-                Session runs
+                {tab === 'saved' ? 'Saved runs' : 'Session runs'}
               </span>
               <span className="text-[10px] font-mono text-[var(--ink-muted)] ml-2 font-semibold">
-                ({runs.length} in this tab, not saved)
+                {tab === 'saved' ? '(on your account)' : `(${runs.length} in this tab)`}
               </span>
             </div>
           </div>
+          {savedRuns && (
+            <div className="w-56">
+              <Segmented<'session' | 'saved'>
+                label="Which runs"
+                value={tab}
+                onChange={setTab}
+                options={[
+                  { value: 'session', label: 'This tab' },
+                  { value: 'saved', label: 'Saved' },
+                ]}
+              />
+            </div>
+          )}
           <button
             type="button"
             onClick={onClose}
@@ -71,93 +107,124 @@ export function SessionRunsModal({ runs, onLoad, onPrint, onClose }: Props) {
           </button>
         </div>
 
-        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-          <ul className="md:w-80 max-h-48 md:max-h-none border-b md:border-b-0 md:border-r border-[var(--border-color)] bg-[var(--well-bg)] overflow-y-auto p-3 space-y-2">
-            {runs.length === 0 && (
-              <li className="p-6 text-center text-xs font-mono text-[var(--ink-muted)]">
-                No runs yet in this session.
-              </li>
-            )}
-            {runs.map((r) => {
-              const invested = investedOf(r);
-              return (
-                <li key={r.id}>
+        {tab === 'saved' ? (
+          <div className="flex-1 bg-[var(--card-bg)] overflow-y-auto p-4 sm:p-6">
+            <SavedRunsPanel />
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+            <ul className="md:w-80 max-h-48 md:max-h-none border-b md:border-b-0 md:border-r border-[var(--border-color)] bg-[var(--well-bg)] overflow-y-auto p-3 space-y-2">
+              {runs.length >= COMPARE_MIN && (
+                <li className="flex items-center justify-between gap-2 px-1 pb-1">
+                  <span className="text-[10px] font-mono text-[var(--ink-muted)]">
+                    Tick {COMPARE_MIN}–{COMPARE_MAX} runs to compare
+                  </span>
                   <button
                     type="button"
-                    onClick={() => setSelectedId(r.id)}
-                    aria-current={r.id === selectedId}
-                    className={`w-full text-left p-3 rounded-2xl transition-all ${
-                      r.id === selectedId
-                        ? 'clay-tile-light border-l-4 border-l-[var(--accent-primary)]'
-                        : 'hover:bg-[var(--well-deep)]'
-                    }`}
+                    onClick={() => onCompare(pickedRuns)}
+                    disabled={pickedRuns.length < COMPARE_MIN}
+                    className="clay-btn-primary px-2.5 py-1 text-[11px] font-mono uppercase flex items-center gap-1.5 disabled:opacity-50"
                   >
-                    <div className="flex justify-between text-[10px] font-mono text-[var(--ink-muted)] mb-1">
-                      <span>{r.id}</span>
-                      <span>{new Date(r.at).toLocaleTimeString()}</span>
-                    </div>
-                    <div className="font-semibold text-xs">
-                      {r.product} · {underlyingLabel(r)}
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] font-mono mt-1 text-[var(--ink-secondary)]">
-                      <span>
-                        {modeLabel(r)}
-                        {invested !== null && ` · ${formatMoney(invested, currencyOf(r))}`}
-                      </span>
-                      <span className="font-bold">{headline(r)}</span>
-                    </div>
+                    <Columns3 className="w-3.5 h-3.5" aria-hidden /> Compare ({pickedRuns.length})
                   </button>
                 </li>
-              );
-            })}
-          </ul>
+              )}
+              {runs.length === 0 && (
+                <li className="p-6 text-center text-xs font-mono text-[var(--ink-muted)]">
+                  No runs yet in this session.
+                </li>
+              )}
+              {runs.map((r) => {
+                const invested = investedOf(r);
+                const isPicked = picked.includes(r.id);
+                return (
+                  <li key={r.id} className="flex items-start gap-2">
+                    {runs.length >= COMPARE_MIN && (
+                      <input
+                        type="checkbox"
+                        checked={isPicked}
+                        onChange={() => togglePicked(r.id)}
+                        disabled={!isPicked && picked.length >= COMPARE_MAX}
+                        aria-label={`Compare ${r.id}`}
+                        className="mt-4 shrink-0 accent-[var(--accent-primary)]"
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedId(r.id)}
+                      aria-current={r.id === selectedId}
+                      className={`w-full text-left p-3 rounded-2xl transition-all ${
+                        r.id === selectedId
+                          ? 'clay-tile-light border-l-4 border-l-[var(--accent-primary)]'
+                          : 'hover:bg-[var(--well-deep)]'
+                      }`}
+                    >
+                      <div className="flex justify-between text-[10px] font-mono text-[var(--ink-muted)] mb-1">
+                        <span>{r.id}</span>
+                        <span>{new Date(r.at).toLocaleTimeString()}</span>
+                      </div>
+                      <div className="font-semibold text-xs">
+                        {r.product} · {underlyingLabel(r)}
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] font-mono mt-1 text-[var(--ink-secondary)]">
+                        <span>
+                          {modeLabel(r)}
+                          {invested !== null && ` · ${formatMoney(invested, currencyOf(r))}`}
+                        </span>
+                        <span className="font-bold">{headline(r)}</span>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
 
-          <div className="flex-1 bg-[var(--card-bg)] overflow-y-auto p-4 sm:p-6 space-y-4">
-            {selected ? (
-              <>
-                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border-color)] pb-4">
-                  <div>
-                    <div className="text-[10px] font-mono text-[var(--ink-muted)] uppercase tracking-wider">
-                      {selected.id} · {new Date(selected.at).toLocaleString()}
+            <div className="flex-1 bg-[var(--card-bg)] overflow-y-auto p-4 sm:p-6 space-y-4">
+              {selected ? (
+                <>
+                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border-color)] pb-4">
+                    <div>
+                      <div className="text-[10px] font-mono text-[var(--ink-muted)] uppercase tracking-wider">
+                        {selected.id} · {new Date(selected.at).toLocaleString()}
+                      </div>
+                      <h2 className="font-serif text-xl font-bold">
+                        {selected.product} ({underlyingLabel(selected)})
+                      </h2>
+                      <div className="text-xs text-[var(--ink-muted)] mt-1">
+                        Risk appetite {selected.profile.riskAppetite}
+                      </div>
                     </div>
-                    <h2 className="font-serif text-xl font-bold">
-                      {selected.product} ({underlyingLabel(selected)})
-                    </h2>
-                    <div className="text-xs text-[var(--ink-muted)] mt-1">
-                      Client {selected.profile.name || '(not entered)'} · risk appetite{' '}
-                      {selected.profile.riskAppetite}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onPrint(selected)}
+                        className="clay-btn-secondary px-3.5 py-1.5 text-xs font-mono uppercase flex items-center gap-1.5"
+                      >
+                        <Printer className="w-3.5 h-3.5" aria-hidden /> Print memo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onLoad(selected)}
+                        className="clay-btn-primary px-3.5 py-1.5 text-xs font-mono uppercase flex items-center gap-1.5"
+                      >
+                        Load into desk <ArrowRight className="w-3.5 h-3.5" aria-hidden />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onPrint(selected)}
-                      className="clay-btn-secondary px-3.5 py-1.5 text-xs font-mono uppercase flex items-center gap-1.5"
-                    >
-                      <Printer className="w-3.5 h-3.5" aria-hidden /> Print memo
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onLoad(selected)}
-                      className="clay-btn-primary px-3.5 py-1.5 text-xs font-mono uppercase flex items-center gap-1.5"
-                    >
-                      Load into desk <ArrowRight className="w-3.5 h-3.5" aria-hidden />
-                    </button>
-                  </div>
+                  <RunSummary run={selected} />
+                  <Placeholder
+                    title="This tab only"
+                    reason="This list is the working copy from this browser tab and is gone when it closes. A run is saved to your account when its verdict is calculated; see the Saved list."
+                  />
+                </>
+              ) : (
+                <div className="p-12 text-center text-xs font-mono text-[var(--ink-muted)]">
+                  Select a run to view its details.
                 </div>
-                <RunSummary run={selected} />
-                <Placeholder
-                  title="Not an audit record"
-                  reason="Simulation records are saved by /api/suitability, which is not built yet. These runs disappear when the tab is closed."
-                />
-              </>
-            ) : (
-              <div className="p-12 text-center text-xs font-mono text-[var(--ink-muted)]">
-                Select a run to view its details.
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

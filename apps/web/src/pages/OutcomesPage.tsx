@@ -56,7 +56,12 @@ export function OutcomesPage({ run }: { run: SessionRun | null }) {
       </Tile>
       <Tile>
         <SectionHeader kicker="PRD scenario comparison" title="Payoff at −25%, −10%, 0% and +15%" />
-        <ScenarioTable scenarios={r.scenarios} currency={ccy} levelLabel={`${label} level`} />
+        <ScenarioTable
+          scenarios={r.scenarios}
+          currency={ccy}
+          levelLabel={`${label} level`}
+          payoffLabel={run.product === 'DCD' ? `Payoff (${ccy} equivalent)` : undefined}
+        />
       </Tile>
 
       {r.mode === 'A' && (

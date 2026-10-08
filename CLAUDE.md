@@ -12,13 +12,13 @@ This repository owns the React frontend, Node.js/TypeScript backend, validation,
 
 ## API boundary
 
-Keep these API capabilities available: `configure`, `simulate`, `suitability`, `explain`, and `chat`. Do not rename, remove, merge, or redesign them without explicit approval. The backend consumes validated AI output and remains authoritative for numerical calculations and suitability.
+Keep these API capabilities available: `configure`, `simulate`, `suitability`, `explain`, and `chat`. Do not rename, remove, merge, or redesign them without explicit approval. Authentication, roles and request integrity sit in front of them (`/api/auth`, `/api/admin`, `/api/audit`); the backend enforces permissions, the frontend never does. The backend consumes validated AI output and remains authoritative for numerical calculations and suitability.
 
 ## Architecture and scope
 
 Approved stack: React + TypeScript and Node.js + TypeScript. Supabase (PostgreSQL) is the only database; there is no fallback database (approved 2026-10-04). Do not introduce Kafka, Redis, microservices, Kubernetes, GraphQL, event sourcing, CQRS, an API gateway, or another database without approval.
 
-Products are ELN, DCD, and CPN for an RM user. Do not add login, admin roles, CRM, trading, pricing, tax, fees, early-redemption pricing, or additional products.
+Products are ELN, DCD, and CPN. Users are RM (shown as "User") and Admin accounts (approved 2026-10-07, `docs/decisions/2026-10-07-auth-rbac.md`; the Compliance role was removed 2026-10-08 at Karan's request); do not add further roles, client-facing login, CRM, trading, pricing, tax, fees, early-redemption pricing, or additional products.
 
 ## Engineering rules
 

@@ -55,17 +55,63 @@
   --chart-area-fill: #1e293b;
 }
 
-/* Hide default cursor on desktop when precision custom cursor is active */
+/* Dark theme: set by the user's account setting (or the OS) through data-theme on <html>. */
+:root[data-theme='dark'] {
+  --canvas-bg: #0e131b;
+  --canvas-text: #e6e9ef;
+  --card-bg: #172030;
+  --card-bg-light: #1c2738;
+  --well-bg: #101826;
+  --well-deep: #263349;
+  --well-text: #e6e9ef;
+
+  --border-color: rgba(226, 232, 240, 0.14);
+  --border-strong: rgba(226, 232, 240, 0.28);
+  --border-subtle: rgba(226, 232, 240, 0.07);
+
+  --ink-primary: #f1f4f9;
+  --ink-secondary: #c3cad6;
+  --ink-muted: #94a0b5;
+
+  --accent-primary: #3f63a6;
+  --accent-gradient: linear-gradient(145deg, #4c73b8, #2f4d86);
+  --accent-hover: linear-gradient(145deg, #5a82c8, #38589a);
+  --accent-text: #ffffff;
+  --accent-gold: #e0b64a;
+
+  --shadow-clay: 0 10px 25px -4px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-interactive: 0 14px 32px -4px rgba(0, 0, 0, 0.6), 0 4px 10px rgba(0, 0, 0, 0.35);
+  --inner-highlight: inset 0 1.5px 2px rgba(255, 255, 255, 0.06);
+
+  --status-suitable-bg: #0d2a21;
+  --status-suitable-text: #6ee7b7;
+  --status-suitable-border: #166a4c;
+
+  --status-caution-bg: #2d2410;
+  --status-caution-text: #fcd34d;
+  --status-caution-border: #7a5c12;
+
+  --status-breach-bg: #2f1214;
+  --status-breach-text: #fca5a5;
+  --status-breach-border: #7f2a2a;
+
+  --chart-payoff-stroke: #8fb4f0;
+  --chart-grid-stroke: #2a3548;
+  --chart-area-fill: #8fb4f0;
+}
+
+:root[data-theme='dark'] .clay-segmented-track {
+  box-shadow:
+    inset 2px 2px 4px rgba(0, 0, 0, 0.45),
+    inset -1.5px -1.5px 3px rgba(255, 255, 255, 0.04);
+}
+
+/* Hide the system cursor only while the custom cursor is actually running (it sets
+   data-cursor-live); without it, or with the setting off, the normal pointer is used. */
 @media (pointer: fine) {
-  html,
-  body,
-  button,
-  a,
-  select,
-  input,
-  textarea,
-  [role='button'],
-  label {
+  html[data-cursor-live]:not([data-cursor='off']),
+  html[data-cursor-live]:not([data-cursor='off'])
+    :is(body, button, a, select, input, textarea, [role='button'], label, summary) {
     cursor: none !important;
   }
 }

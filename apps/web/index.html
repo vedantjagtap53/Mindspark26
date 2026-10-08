@@ -16,6 +16,21 @@
     />
   </head>
   <body>
+    <script>
+      // Apply the saved theme (ms_theme cookie) before first paint, so a dark-mode user never
+      // sees a flash of the light theme. The app keeps it in sync once it has loaded.
+      (function () {
+        try {
+          var m = document.cookie.match(/(?:^|; )ms_theme=([^;]*)/);
+          var t = m ? decodeURIComponent(m[1]) : 'light';
+          var dark =
+            t === 'dark' ||
+            (t !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        } catch (e) {}
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

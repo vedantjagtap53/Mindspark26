@@ -1,10 +1,13 @@
 export * from './constants/api.js';
 export * from './constants/forecast.js';
 export * from './enums/domain.js';
+export * from './schemas/activity.js';
+export * from './schemas/auth.js';
 export * from './schemas/forecast.js';
 export * from './schemas/product.js';
 export * from './schemas/simulate.js';
 export * from './schemas/suitability.js';
 export * from './schemas/advisory.js';
 export type * from './types/api.js';
+export type * from './types/audit.js';
 export type * from './types/live.js';

@@ -12,7 +12,7 @@ A simulator that relationship managers (RMs) use to test structured products aga
 Pick product → enter terms → enter client → choose Mode A or B → payoff + risk → verdict → explanation → chat
 ```
 
-- **Mode A (forecast):** the forecast service simulates the underlying (GARCH(1,1) Monte Carlo on a training window the RM picks, 30 days to 3 years) and returns low (P5), base (P50) and high (P95) paths. The result is always a range, never a single price.
+- **Mode A (forecast):** the forecast service simulates the underlying (GARCH(1,1) Monte Carlo on a training window of 30 days to 3 years, chosen by the RM) and returns low (P5), base (P50) and high (P95) paths. The result is always a range, never a single price.
 - **Mode B (shock):** the RM starts from a live, reference or typed level and applies a shock such as −10%.
 - **Both modes use the same deterministic payoff engine** (`apps/api/src/engines/payoff`). The backend does every calculation and the suitability rules; the browser and the AI never decide a number.
 - **The client** is entered for each run: name, age, risk appetite, investment horizon, loss tolerance and concentration. There are no saved profiles. Name and age are display-only: no rule reads them, they are stored with the audit record, and they are never sent to the AI service.
@@ -71,6 +71,8 @@ Root `.env` (copied from [.env.example](.env.example)):
 | `FINNHUB_API_KEY` or `UPSTOX_ACCESS_TOKEN`  | Optional live level in Mode B. Without one, the RM types the level.                                                                               |
 | `MARKET_HISTORY_PROVIDER`                   | `yahoo` shows price history behind the Mode A fan chart; default `none`.                                                                          |
 | `SUITABILITY_CONCENTRATION_LIMIT_PCT`       | Concentration flag threshold, default 25.                                                                                                         |
+| `AUTH_JWT_SECRET`                           | Signs access tokens (32+ characters). Set by `setup`. Required in production.                                                                     |
+| `AUTH_ENFORCED`, `PAYLOAD_HASH_REQUIRED`    | Default on in production, off in development. See Accounts below.                                                                                 |
 
 `services/rag/.env` needs `GOOGLE_API_KEY` (a Gemini key). After adding it, build the knowledge-base index once with `npm run rag:index`, and again whenever you edit `services/rag/rag/knowledge/`.
 
@@ -90,6 +92,23 @@ Put the project URL and the service-role (or `sb_secret_…`) key in `.env`. **K
 
 For a local database run `npx supabase start` (needs Docker).
 
+### Accounts and sign-in
+
+Staff sign in with an email and password; sessions use httpOnly cookies (an access token and a rotating refresh token). Accounts live in Supabase, so apply the migrations first. There are two roles:
+
+| Role         | Can do                                                                                  |
+| ------------ | --------------------------------------------------------------------------------------- |
+| `RM` ("User") | Run simulations, suitability checks, explanations and chat; see their own saved runs.    |
+| `ADMIN`      | Everything a user can do, plus every account's runs, the activity log and analytics, and user management. |
+
+Anyone can register as a user. Create the first admin from your terminal, then sign in on the same page (users and admins share it) to reach the admin console and create further admin accounts:
+
+```sh
+ADMIN_EMAIL=you@bank.com ADMIN_PASSWORD='Strong-Passw0rd' npm run seed:admin
+```
+
+In development, sign-in is optional (the simulator is open to anonymous visitors, and the sign-in button is in the settings menu); in production (`NODE_ENV=production`) it is required. Every user can switch between light, dark and system themes, and turn the custom cursor off, in the account menu; the choice is saved to their account. The web app sends a SHA-256 hash of every request body (`X-Payload-Hash`) and the API checks it. Decision record and known limits: [docs/decisions/2026-10-07-auth-rbac.md](docs/decisions/2026-10-07-auth-rbac.md).
+
 ## Everyday commands
 
 | Command                                   | What it does                                      |
@@ -107,7 +126,7 @@ Tests against a real database are skipped unless you set `SUPABASE_TEST_URL`, `S
 
 ## API
 
-All under `/api`: `GET /health`, `POST /configure`, `POST /simulate`, `POST /suitability`, `POST /explain`, `POST /chat`, and a WebSocket `/live` for the price ticker. Request and response shapes: [API_SPEC.md](API_SPEC.md).
+All under `/api`: `GET /health`, `POST /configure`, `POST /simulate`, `POST /suitability`, `POST /explain`, `POST /chat`, a WebSocket `/live` for the price ticker, and the account routes `/auth/*`, `/admin/*` and `/audit/*`. Request and response shapes: [API_SPEC.md](API_SPEC.md).
 
 ## Keeping Mode A fresh
 

@@ -6,7 +6,7 @@
 Help a relationship manager (RM) configure a structured product, see how it pays off under different market conditions, check it against a client's profile, and get a plain-language risk explanation. Goal: reduce mis-selling risk and give a documented suitability check.
 
 ## 2. User
-One user: the **RM**. No client login, no admin role.
+The **RM** (shown as "User" in the app) runs the desk. Since 2026-10-07 (approved by Karan, `docs/decisions/2026-10-07-auth-rbac.md`) staff sign in and have one of two roles: **User (RM)** and **Admin** (user management, activity and analytics). The Compliance role was removed on 2026-10-08 at Karan's request. No client login. See §11.
 
 ## 3. Products in Scope
 | Product | Summary | Key inputs |
@@ -21,7 +21,7 @@ One user: the **RM**. No client login, no admin role.
 1. RM lands on the **dashboard** showing three product cards: ELN, DCD, CPN.
 2. RM selects a card and opens the configuration screen.
 3. RM enters product terms (see table above), including any tenor in the allowed range.
-4. RM enters the **client profile for this simulation**: name, age, risk appetite, investment horizon, loss tolerance and concentration (share of portfolio in this product or underlying). Client profiles are not saved or loaded.
+4. RM enters the **client profile for this simulation**: risk appetite, investment horizon, loss tolerance and concentration (share of portfolio in this product or underlying). No client name or age is asked (changed 2026-10-08 at Karan's request: the RM signs in first, from the home page). Client profiles are not saved or loaded.
 5. RM picks a simulation mode:
    - **Mode A:** ML forecast. A statistical model trained on the underlying's historical data simulates many possible price paths over the chosen tenor and returns a **low, base and high case** (5th, 50th and 95th percentile). The product is run on all three cases.
    - **Mode B:** manual shock on the live underlying level (-10%, 0%, +x%).
@@ -94,7 +94,7 @@ flowchart TB
 ### 7.1 Frontend
 - Dashboard with three product cards.
 - Product-specific configuration form with validation (for example barrier below strike, tenor between 30 and 1,095 days, positive notional).
-- Client profile form for each simulation: name, age (18–120), risk appetite, investment horizon, loss tolerance and concentration. Name and age are display-only; saved profiles are not supported.
+- Client profile form for each simulation: risk appetite, investment horizon, loss tolerance and concentration. Client name and age are no longer asked (2026-10-08); the API still accepts them as optional display-only fields. Saved profiles are not supported.
 - Simulation mode selector (A or B), a Mode A training-window selector (30 days to 3 years, default 3 years), and a shock input for Mode B (presets and custom %).
 - Results view:
   - Payoff-at-maturity chart across a range of underlying levels, with strike, barrier and breakeven marked.
@@ -106,6 +106,8 @@ flowchart TB
   - Plain-language explanation panel and chat box.
 - Highlight the barrier "cliff" on ELN charts, and the capped gain versus open-ended loss on DCD.
 - Show a clear "simulation, not a guarantee" notice. In Mode A, present the result as a range ("Base X, likely range L to H"), never as a single predicted value.
+- Compare runs (added 2026-10-08 at Karan's request): the RM can put two or three runs from the session side by side (product, mode, payoff and return, Mode A range and probabilities, verdict and flags). It shows only the backend's results, warns when the runs used different client profiles, modes, shocks or currencies, and does not rank the products or recommend one.
+- Open a saved run (added 2026-10-08 at Karan's request): a user can open the full stored record of any of their own saved runs, and an Admin any account's, and print it. It shows what was stored when the run was made (§7.2 record keeping) and recalculates nothing.
 
 ### 7.2 Backend
 - **Market data service:** fetch and store historical daily closes (underlyings, FX pairs) and the live underlying level (for example Nifty 50). Handle missing data (trading holidays are skipped, not filled) and show data timestamps. Supplies history for the forecast chart and the live level for Mode B.
@@ -161,7 +163,7 @@ No promised returns, no advice beyond the computed verdict, risk wording always 
 
 ## 8. Out of Scope
 - Real trading, order placement, or issuer pricing and fair-value calculation.
-- Multiple user roles, client-facing login, or CRM integration.
+- Client-facing login, or CRM integration. (Staff accounts and roles are in scope since 2026-10-07, §11.)
 - Products beyond ELN, DCD and CPN.
 - Tax, fees, and early-redemption pricing (can be noted as future work).
 - Tenors above 3 years, intraday data, and point (single-value) price prediction.
@@ -181,3 +183,14 @@ No promised returns, no advice beyond the computed verdict, risk wording always 
 - Added Mode A distribution metrics (probability of loss and of knock-in), the fan chart and model card.
 - Added the backend forecast client and the forecast contract (`docs/forecasting.md`).
 - Success criteria for forecast latency and band coverage added.
+
+## 11. Accounts, roles and sessions (added 2026-10-07)
+Approved by Karan on 2026-10-07. Decision record: `docs/decisions/2026-10-07-auth-rbac.md`.
+- **Roles and permissions.** User (RM): run simulations, suitability checks, explanations and chat, and see their own saved runs. Admin: everything a user can do, plus see every account's saved runs, the activity log and analytics, create users, change roles and deactivate users. (The Compliance role was removed on 2026-10-08.)
+- **Registration and sign-in.** Anyone can register as a user (full name, email id, password); Admin accounts are created by an Admin (the first Admin is seeded from the command line). One sign-in page serves users and admins: the server decides the role and the app opens the simulator for a user and the admin console for an admin. A signed-out visitor starts on the home page and goes to Log in or Create account from there.
+- **Saved runs.** Each run is saved to the account that ran it when its verdict is calculated. A user sees only their own runs (Runs window, Saved); an admin sees all of them with the account that ran each. Another account's run id is refused as not found.
+- **Admin console (added 2026-10-08).** Overview (accounts, runs, sign-ins, failed sign-ins, runs per day, runs by product, mode and verdict, most active accounts), Activity log (sign-ups, sign-ins and failures, sign-outs, account changes, saved runs), All runs, and Users. The log never stores passwords, tokens or request bodies.
+- **Sessions.** A short-lived access token and a rotating refresh token travel in httpOnly cookies. Passwords are stored only as salted hashes.
+- **Settings.** Each user has a saved theme (light, dark or system) and a custom-cursor switch.
+- **Request integrity.** The web app sends a SHA-256 hash of every request body; the API rejects a body that does not match.
+- The role checks live in the backend; the frontend only chooses which screens to show.

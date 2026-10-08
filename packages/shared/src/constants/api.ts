@@ -8,4 +8,8 @@ export const API_ROUTES = {
   suitability: '/suitability',
   explain: '/explain',
   chat: '/chat',
+  auth: '/auth',
+  admin: '/admin',
+  audit: '/audit',
+  runs: '/runs',
 } as const;

@@ -92,10 +92,6 @@ export function PrintReport({ run, onClose }: Props) {
               <span className="text-[10px] uppercase font-bold text-neutral-500 block mb-1">
                 Client profile
               </span>
-              <div className="font-semibold text-sm">
-                {run.profile.name || 'No client name'}
-              </div>
-              <div>Age: {run.profile.age || '—'}</div>
               <div>Risk appetite: {run.profile.riskAppetite}</div>
               <div>Horizon: {run.profile.horizonMonths} months</div>
               <div>Loss tolerance: {run.profile.lossTolerancePct}%</div>
@@ -124,6 +120,7 @@ export function PrintReport({ run, onClose }: Props) {
                 scenarios={r.scenarios}
                 currency={ccy}
                 levelLabel={`${underlyingLabel(run)} level`}
+                payoffLabel={run.product === 'DCD' ? `Payoff (${ccy} equivalent)` : undefined}
                 compact
               />
             </Section>
