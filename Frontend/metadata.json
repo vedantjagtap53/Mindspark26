@@ -1,6 +1,0 @@
-{
-  "name": "Payoff Desk",
-  "description": "Suitability-aware payoff simulator for structured products used by bank relationship managers.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
