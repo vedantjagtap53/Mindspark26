@@ -1,5 +1,6 @@
 // Mode A risk panel: payoff, return and knock-in for the low, base and high case paths.
 import type { SimulateModeAResponse } from '@mindspark/shared';
+import { revealStyle } from '../../motion/reveal';
 import { formatLevel, formatMoney, formatPct, knockInLabel } from '../../utils/format';
 
 interface Props {
@@ -43,8 +44,8 @@ export function RiskPanel({ response, currency, compact = false }: Props) {
           </tr>
         </thead>
         <tbody className="divide-y divide-[var(--border-subtle)] font-mono">
-          {rows.map(({ name, c }) => (
-            <tr key={name}>
+          {rows.map(({ name, c }, i) => (
+            <tr key={name} className="reveal-fade" style={revealStyle(i)}>
               <th scope="row" className={`${cell} font-sans font-semibold`}>
                 {name} <span className="text-[var(--ink-muted)] font-mono">P{c.percentile}</span>
               </th>

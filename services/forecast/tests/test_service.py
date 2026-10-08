@@ -10,11 +10,11 @@ TODAY = dt.date(2026, 10, 3)            # data is as of 2026-10-01
 svc = ForecastService(today=lambda: TODAY)
 
 
-def req(tenor, samples=100, window=10):
+def req(tenor, samples=100, window=3):
     return dict(symbol="^NSEI", tenorDays=tenor, samplePathCount=samples, trainingWindowYears=window)
 
 
-def run(tenor, samples=100, window=10):
+def run(tenor, samples=100, window=3):
     return svc.forecast("^NSEI", "index", tenor, window, samples)
 
 
@@ -45,11 +45,11 @@ def test_every_series_starts_at_spot():
 
 
 def test_metadata_fields():
-    r = run(182, window=5)
+    r = run(182, window=3)
     assert r["contractVersion"] == "1.0" and r["model"]["simulations"] >= 10000
     assert r["model"]["drift"] == {"method": "fixed", "annualized": 0.0756}
     assert r["data"]["trainingStart"] < r["data"]["trainingEnd"] == r["data"]["asOf"] == "2026-10-01"
-    assert r["data"]["observations"] > 1000
+    assert r["data"]["observations"] > 700
     bt = r["backtest"]
     assert bt["horizonTradingDays"] == 124 and 0 <= bt["bandCoverage"] <= 1 and bt["baseMape"] < 1
 
@@ -67,8 +67,25 @@ def test_rejections():
     assert raises("UNSUPPORTED_UNDERLYING", "AAPL", "equity", 90).status == 400
     assert raises("UNSUPPORTED_UNDERLYING", "^NSEI", "fx", 90).status == 400
     raises("INVALID_REQUEST", "^NSEI", "index", 90, 7)
-    raises("INVALID_REQUEST", "^NSEI", "index", 90, 10, 99)
-    raises("INVALID_REQUEST", "^NSEI", "index", 90, 10, 2001)
+    raises("INVALID_REQUEST", "^NSEI", "index", 90, 3, 99)
+    raises("INVALID_REQUEST", "^NSEI", "index", 90, 3, 2001)
+
+
+def test_training_window_is_30_days_to_3_years():
+    # Accepted: the whole range, as fractional years. The window starts that many calendar days
+    # before the last close and is returned in trainingStart/observations.
+    last = dt.date(2026, 10, 1)
+    seen = []
+    for years in (30 / 365, 0.5, 1, 2.4, 3):
+        r = run(90, window=years)
+        start = dt.date.fromisoformat(r["data"]["trainingStart"])
+        assert dt.date.fromisoformat(r["data"]["trainingEnd"]) == last
+        assert (last - start).days <= round(years * 365)
+        seen.append(r["data"]["observations"])
+    assert seen == sorted(seen) and seen[0] < seen[-1]        # a longer window uses more returns
+    # Rejected: below 30 days, above 3 years, the old 5/10, and non-numbers.
+    for bad in (29 / 365, 0, -1, 3.01, 5, 10, True, "3", None):
+        assert raises("INVALID_REQUEST", "^NSEI", "index", 90, bad).status == 422, bad
 
 
 def test_stale_data_rejected_after_5_days():
@@ -155,8 +172,12 @@ def test_http_auth_and_strict_request():
             assert c.post("/v1/forecast", json=body, headers={"Authorization": "Bearer wrong"}).status_code == 401
             assert c.get("/v1/model-card").status_code == 401
             assert c.get("/v1/health").status_code == 200
+            for years in (30 / 365, 0.5, 3):                      # integer 3 and fractions both pass
+                assert c.post("/v1/forecast", json={**body, "trainingWindowYears": years}, headers=auth).status_code == 200
             for bad in ({**body, "tenorDays": "182"}, {**body, "tenorDays": 182.5}, {**body, "extra": 1},
-                        {**body, "underlying": "^NSEI"}, {**body, "trainingWindowYears": 7}):
+                        {**body, "underlying": "^NSEI"}, {**body, "trainingWindowYears": 7},
+                        {**body, "trainingWindowYears": 29 / 365}, {**body, "trainingWindowYears": "3"},
+                        {**body, "trainingWindowYears": True}, {**body, "trainingWindowYears": None}):
                 r = c.post("/v1/forecast", json=bad, headers=auth)
                 assert r.status_code == 422 and r.json()["error"]["code"] == "INVALID_REQUEST", bad
     finally:

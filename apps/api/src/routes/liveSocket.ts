@@ -2,7 +2,7 @@
 // talks to the provider (or sees its API key). Display only; simulations resolve their own level.
 // Protocol (packages/shared/src/types/live.ts): the client sends {"type":"subscribe","symbol"} or
 // {"type":"unsubscribe"}; the server sends "subscribed", "tick" and "error" messages.
-import type { Server } from 'node:http';
+import type { IncomingMessage, Server } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { z } from 'zod';
 import { API_BASE_PATH, type LiveServerMessage } from '@mindspark/shared';
@@ -101,13 +101,25 @@ function handleClient(ws: WebSocket, stream: LiveStream | undefined, logger: Log
   ws.on('error', unsubscribe);
 }
 
-/** Serves /api/live on the HTTP server; other upgrade requests are refused. */
-export function attachLiveSocket(server: Server, stream: LiveStream | undefined, logger: Logger) {
+/**
+ * Serves /api/live on the HTTP server; other upgrade requests are refused. With `isAllowed`, a
+ * connection it rejects gets 401 before the upgrade (a WebSocket never passes the Express middleware).
+ */
+export function attachLiveSocket(
+  server: Server,
+  stream: LiveStream | undefined,
+  logger: Logger,
+  isAllowed?: (req: IncomingMessage) => boolean,
+) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 });
   server.on('upgrade', (req, socket, head) => {
     const path = new URL(req.url ?? '/', 'http://localhost').pathname;
     if (path !== LIVE_PATH) {
       socket.destroy();
+      return;
+    }
+    if (isAllowed && !isAllowed(req)) {
+      socket.end('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
       return;
     }
     wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));

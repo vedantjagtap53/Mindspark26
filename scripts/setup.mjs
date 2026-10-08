@@ -25,6 +25,7 @@ step('.env files');
 // The backend and the forecast service share AI_API_KEY (scripts/dev-service.mjs passes it on).
 createEnv(join(root, '.env'), join(root, '.env.example'), (text) =>
   text
+    .replace(/^AUTH_JWT_SECRET=$/m, `AUTH_JWT_SECRET=${randomBytes(48).toString('hex')}`)
     .replace(/^AI_API_URL=$/m, 'AI_API_URL=http://127.0.0.1:8000/v1')
     .replace(/^AI_API_KEY=$/m, `AI_API_KEY=${randomBytes(32).toString('hex')}`)
     .replace(/^RAG_API_URL=$/m, 'RAG_API_URL=http://127.0.0.1:8001')

@@ -10,6 +10,8 @@ export class ConfigError extends Error {
   }
 }
 
+const booleanFlag = z.enum(['true', 'false']).transform((v) => v === 'true');
+
 // `.env.example` ships empty values (`KEY=`); treat them as unset.
 const emptyToUndefined = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? undefined : v);
 const unsetIfEmpty = <T extends z.ZodType>(schema: T) => z.preprocess(emptyToUndefined, schema);
@@ -33,9 +35,28 @@ const envSchema = z
     ),
     SUPABASE_SERVICE_ROLE_KEY: optional(z.string()),
 
+    // Sessions (docs/decisions/2026-10-07-auth-rbac.md). The secret signs access tokens; required
+    // in production, otherwise a random per-process secret is used and sessions end on restart.
+    AUTH_JWT_SECRET: optional(z.string().min(32, 'must be at least 32 characters')),
+    AUTH_ACCESS_TTL_SECONDS: unsetIfEmpty(z.coerce.number().int().min(60).max(3600).default(900)),
+    AUTH_REFRESH_TTL_SECONDS: unsetIfEmpty(
+      z.coerce.number().int().min(3600).max(2_592_000).default(604_800),
+    ),
+    // Default true in production, false otherwise: when false, anonymous requests may use the
+    // simulator (existing tests and local development without a database).
+    AUTH_ENFORCED: optional(booleanFlag),
+    // Default true in production, false otherwise: when true, mutating requests with a body must
+    // carry a matching X-Payload-Hash header.
+    PAYLOAD_HASH_REQUIRED: optional(booleanFlag),
+    // Default true in production. Set false only when serving over plain http outside localhost.
+    AUTH_COOKIE_SECURE: optional(booleanFlag),
+
     AI_API_URL: optional(z.url()),
     AI_API_KEY: optional(z.string()),
     AI_FORECAST_TIMEOUT_MS: unsetIfEmpty(z.coerce.number().int().positive().default(15_000)),
+    // Reuse a forecast for an identical request this long (in memory; 0 turns it off). The service
+    // has a fixed random seed, so this changes no result, only the wait.
+    AI_FORECAST_CACHE_SECONDS: unsetIfEmpty(z.coerce.number().int().min(0).max(3600).default(900)),
     // Explanation and chat service (services/rag). RAG_API_KEY is sent as X-API-Key and must
     // equal that service's SERVICE_API_KEY.
     RAG_API_URL: optional(z.url()),
@@ -58,6 +79,8 @@ const envSchema = z
     // Daily FX reference rates (Frankfurter). Slack covers weekends and holidays.
     FX_API_URL: unsetIfEmpty(z.url().default('https://api.frankfurter.dev')),
     FX_RATE_MAX_AGE_DAYS: unsetIfEmpty(z.coerce.number().int().positive().default(4)),
+    // Reuse a pair's rate this long (in memory; 0 turns it off). It is an end-of-day rate.
+    FX_RATE_CACHE_SECONDS: unsetIfEmpty(z.coerce.number().int().min(0).max(86_400).default(3600)),
     // Daily closes for the Mode A fan chart. Off by default: Yahoo Finance is free and keyless
     // but unofficial (no SLA; its terms apply).
     MARKET_HISTORY_PROVIDER: unsetIfEmpty(z.enum(['none', 'yahoo']).default('none')),
@@ -73,6 +96,13 @@ const envSchema = z
       });
     }
     if (env.NODE_ENV === 'production') {
+      if (!env.AUTH_JWT_SECRET) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['AUTH_JWT_SECRET'],
+          message: 'AUTH_JWT_SECRET is required in production',
+        });
+      }
       for (const name of SUPABASE_REQUIRED) {
         if (!env[name]) {
           ctx.addIssue({

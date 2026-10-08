@@ -1,5 +1,7 @@
-// Precision cursor for mouse users. index.css hides the system cursor on fine pointers, so this
-// must stay mounted. With reduced motion the ring follows the pointer without easing.
+// Precision cursor for mouse users: a focal dot plus a lagging ring that grows over clickable things.
+// It is mounted once, at the app root, so every screen (sign-in, admin, simulator) has it.
+// index.css hides the system cursor only while <html data-cursor-live> is set, and this component
+// sets that attribute only while it is actually running, so the pointer can never go missing.
 import { useEffect, useRef, useState } from 'react';
 
 const isFinePointer = () =>
@@ -8,11 +10,12 @@ const isFinePointer = () =>
   window.matchMedia('(pointer: fine)').matches;
 
 const CLICKABLE =
-  'button, a, select, input, textarea, label, tr, [role="button"], [role="radio"], [role="tab"]';
+  'button, a, select, input, textarea, label, summary, tr, [role="button"], [role="radio"], [role="tab"], [role="switch"], .cursor-pointer';
 
 export function CustomCursor() {
   const [enabled] = useState(isFinePointer);
-  const [visible, setVisible] = useState(true);
+  // Hidden until the first mouse move (and whenever the pointer leaves the window).
+  const [visible, setVisible] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
   const dotRef = useRef<HTMLDivElement>(null);
@@ -20,6 +23,7 @@ export function CustomCursor() {
 
   useEffect(() => {
     if (!enabled) return;
+    const root = document.documentElement;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const lerp = reduced ? 1 : 0.25;
     const target = { x: -100, y: -100 };
@@ -28,6 +32,7 @@ export function CustomCursor() {
     const onMove = (e: MouseEvent) => {
       target.x = e.clientX;
       target.y = e.clientY;
+      setVisible(true);
       const el = e.target instanceof Element ? e.target : null;
       setHovered(el?.closest(CLICKABLE) != null);
     };
@@ -56,7 +61,11 @@ export function CustomCursor() {
     };
     frame = requestAnimationFrame(tick);
 
+    // From here the system cursor may be hidden: this component is running.
+    root.setAttribute('data-cursor-live', '');
+
     return () => {
+      root.removeAttribute('data-cursor-live');
       cancelAnimationFrame(frame);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mousedown', onDown);
@@ -66,14 +75,13 @@ export function CustomCursor() {
     };
   }, [enabled]);
 
-  if (!enabled || !visible) return null;
+  if (!enabled) return null;
 
   return (
-    <>
+    <div className="no-print" style={{ opacity: visible ? 1 : 0 }} aria-hidden="true">
       <div
         ref={ringRef}
-        aria-hidden="true"
-        className={`no-print fixed top-0 left-0 pointer-events-none z-[99999] rounded-full transition-[width,height,opacity,border-color,background-color] duration-150 ease-out will-change-transform ${
+        className={`fixed top-0 left-0 pointer-events-none z-[99999] rounded-full transition-[width,height,opacity,border-color,background-color] duration-150 ease-out will-change-transform ${
           hovered
             ? 'w-10 h-10 border-[1.5px] border-[var(--ink-primary)] bg-[var(--border-color)] opacity-100'
             : pressed
@@ -83,13 +91,12 @@ export function CustomCursor() {
       />
       <div
         ref={dotRef}
-        aria-hidden="true"
-        className={`no-print fixed top-0 left-0 pointer-events-none z-[99999] rounded-full transition-[width,height,background-color] duration-75 ease-out will-change-transform ${
+        className={`fixed top-0 left-0 pointer-events-none z-[99999] rounded-full transition-[width,height,background-color] duration-75 ease-out will-change-transform ${
           hovered || pressed
             ? 'w-2 h-2 bg-[var(--ink-primary)]'
             : 'w-1.5 h-1.5 bg-[var(--ink-secondary)]'
         }`}
       />
-    </>
+    </div>
   );
 }

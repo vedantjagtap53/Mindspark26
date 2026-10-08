@@ -8,6 +8,11 @@ const apiTarget = process.env.VITE_API_PROXY_TARGET ?? 'http://127.0.0.1:4000';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Libraries that are only reached through lazy imports. Without this, the dev server discovers them
+  // the first time they are needed, re-bundles, and reloads the whole page (losing the user's place).
+  optimizeDeps: {
+    include: ['swiper/react', 'swiper/modules', 'gsap', 'gsap/ScrollTrigger', 'lenis'],
+  },
   server: {
     port: 3000,
     // ws: true also forwards the /api/live WebSocket (live prices).

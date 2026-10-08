@@ -7,11 +7,13 @@ Backend config: AI_API_URL=http://127.0.0.1:8000/v1 (the backend calls {AI_API_U
 """
 import hmac, os
 from contextlib import asynccontextmanager
-from typing import Literal
+from typing import Annotated, Literal
 from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, StrictInt, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, StrictStr
+from .contract import (DEFAULT_TRAINING_WINDOW_YEARS, TRAINING_WINDOW_MAX_YEARS,
+                       TRAINING_WINDOW_MIN_YEARS)
 from .service import ForecastService, ApiError
 
 svc: ForecastService = None
@@ -47,7 +49,9 @@ class ForecastRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     underlying: Underlying
     tenorDays: StrictInt
-    trainingWindowYears: Literal[5, 10] = 10
+    trainingWindowYears: Annotated[
+        StrictFloat, Field(ge=TRAINING_WINDOW_MIN_YEARS, le=TRAINING_WINDOW_MAX_YEARS)
+    ] = DEFAULT_TRAINING_WINDOW_YEARS
     samplePathCount: StrictInt = 500
 
 

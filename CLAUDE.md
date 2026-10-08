@@ -2,7 +2,7 @@
 
 ## Source of truth
 
-`PRD.md` is the sole authoritative requirements document. Files under `prd/` are reference/archive material only. If a file under `prd/` conflicts with `PRD.md`, always follow `PRD.md`.
+`PRD.md` is the sole authoritative requirements document. Earlier PRD versions are not kept in the repository (removed 2026-10-08); they remain in git history only. If any older requirements text conflicts with `PRD.md`, always follow `PRD.md`.
 
 Do not invent, remove, or change requirements. Ask for clarification when a decision affects architecture, scope, API contracts, database design, financial formulas, suitability rules, or another developer's AI work.
 
@@ -12,13 +12,13 @@ This repository owns the React frontend, Node.js/TypeScript backend, validation,
 
 ## API boundary
 
-Keep these API capabilities available: `configure`, `simulate`, `suitability`, `explain`, and `chat`. Do not rename, remove, merge, or redesign them without explicit approval. The backend consumes validated AI output and remains authoritative for numerical calculations and suitability.
+Keep these API capabilities available: `configure`, `simulate`, `suitability`, `explain`, and `chat`. Do not rename, remove, merge, or redesign them without explicit approval. Authentication, roles and request integrity sit in front of them (`/api/auth`, `/api/admin`, `/api/audit`); the backend enforces permissions, the frontend never does. The backend consumes validated AI output and remains authoritative for numerical calculations and suitability.
 
 ## Architecture and scope
 
 Approved stack: React + TypeScript and Node.js + TypeScript. Supabase (PostgreSQL) is the only database; there is no fallback database (approved 2026-10-04). Do not introduce Kafka, Redis, microservices, Kubernetes, GraphQL, event sourcing, CQRS, an API gateway, or another database without approval.
 
-Products are ELN, DCD, and CPN for an RM user. Do not add login, admin roles, CRM, trading, pricing, tax, fees, early-redemption pricing, or additional products.
+Products are ELN, DCD, and CPN. Users are RM (shown as "User") and Admin accounts (approved 2026-10-07, `docs/decisions/2026-10-07-auth-rbac.md`; the Compliance role was removed 2026-10-08 at Karan's request); do not add further roles, client-facing login, CRM, trading, pricing, tax, fees, early-redemption pricing, or additional products.
 
 ## Engineering rules
 
@@ -37,6 +37,6 @@ Business logic must not call the Supabase SDK directly.
 Controller → Service → Repository interface → Supabase adapter
 ```
 
-Keep the Supabase implementation isolated in its adapter (`apps/api/src/repositories/supabase`). The service-role key is server-only and never reaches the frontend. There is no failover: if Supabase is unavailable, persistence fails with a clear error instead of writing anywhere else. The schema is the SQL migrations in `supabase/migrations/`; see `DATABASE_SCHEMA.md`.
+Keep the Supabase implementation isolated in its adapter (`apps/api/src/repositories/supabase`). The service-role key is server-only and never reaches the frontend. There is no failover: if Supabase is unavailable, persistence fails with a clear error instead of writing anywhere else. The schema is the SQL migrations in `supabase/migrations/`; see `docs/DATABASE_SCHEMA.md`.
 
 Do not dual-write, replicate, or synchronize to any other store. Replacing the provider, adding a provider or a fallback, changing the repository abstraction or schema architecture, or introducing dual-write, replication, or Kafka requires explicit approval.

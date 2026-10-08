@@ -4,7 +4,9 @@ import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
 import type { LiveServerMessage } from '@mindspark/shared';
+import { createUpgradeAuthorizer } from '../../src/middleware/authenticate.js';
 import { attachLiveSocket } from '../../src/routes/liveSocket.js';
+import { createAccessTokenSigner } from '../../src/services/auth/accessToken.js';
 import {
   MarketDataError,
   type LevelQuote,
@@ -38,9 +40,12 @@ function fakeStream() {
   return { stream, emitters, stopped };
 }
 
-async function start(stream: LiveStream | undefined) {
+async function start(
+  stream: LiveStream | undefined,
+  isAllowed?: Parameters<typeof attachLiveSocket>[3],
+) {
   server = createServer();
-  live = attachLiveSocket(server, stream, silentLogger);
+  live = attachLiveSocket(server, stream, silentLogger, isAllowed);
   await new Promise<void>((r) => server!.listen(0, '127.0.0.1', r));
   return (server.address() as AddressInfo).port;
 }
@@ -118,5 +123,40 @@ describe('/api/live', () => {
   it('refuses websocket upgrades on other paths', async () => {
     const port = await start(fakeStream().stream);
     await expect(connect(port, '/api/other')).rejects.toBeTruthy();
+  });
+});
+
+describe('/api/live sign-in', () => {
+  const signer = createAccessTokenSigner({ secret: 's'.repeat(40), ttlSeconds: 900 });
+  const withCookie = (port: number, cookie?: string) =>
+    new Promise<string>((resolve) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}/api/live`, {
+        headers: cookie ? { cookie } : {},
+      });
+      ws.once('open', () => {
+        ws.close();
+        resolve('open');
+      });
+      ws.once('unexpected-response', (_req, res) => resolve(`HTTP ${res.statusCode}`));
+      ws.once('error', () => undefined);
+    });
+
+  it('refuses a connection without a valid session when sign-in is enforced', async () => {
+    const port = await start(fakeStream().stream, createUpgradeAuthorizer(signer, true));
+    expect(await withCookie(port)).toBe('HTTP 401');
+    expect(await withCookie(port, 'ms_access=garbage')).toBe('HTTP 401');
+  });
+
+  it('accepts a signed-in user and a signed-in admin', async () => {
+    const port = await start(fakeStream().stream, createUpgradeAuthorizer(signer, true));
+    const rm = signer.sign({ id: 'u2', role: 'RM' });
+    expect(await withCookie(port, `other=1; ms_access=${rm}`)).toBe('open');
+    const admin = signer.sign({ id: 'u3', role: 'ADMIN' });
+    expect(await withCookie(port, `ms_access=${admin}`)).toBe('open');
+  });
+
+  it('accepts everyone when sign-in is not enforced', async () => {
+    const port = await start(fakeStream().stream, createUpgradeAuthorizer(signer, false));
+    expect(await withCookie(port)).toBe('open');
   });
 });

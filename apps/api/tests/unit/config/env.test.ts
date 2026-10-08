@@ -68,8 +68,19 @@ describe('parseEnv', () => {
         NODE_ENV: 'production',
         SUPABASE_URL: 'https://x.supabase.co',
         SUPABASE_SERVICE_ROLE_KEY: 'k',
+        AUTH_JWT_SECRET: 's'.repeat(32),
       }).NODE_ENV,
     ).toBe('production');
+  });
+
+  it('requires AUTH_JWT_SECRET in production, at least 32 characters', () => {
+    const base = {
+      NODE_ENV: 'production',
+      SUPABASE_URL: 'https://x.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY: 'k',
+    };
+    expect(() => parseEnv(base)).toThrow('AUTH_JWT_SECRET is required in production');
+    expect(() => parseEnv({ ...base, AUTH_JWT_SECRET: 'short' })).toThrow('AUTH_JWT_SECRET');
   });
 
   it('does not require database configuration outside production', () => {
@@ -105,6 +116,7 @@ describe('loadConfig', () => {
       API_PORT: '5000',
       SUPABASE_URL: 'https://x.supabase.co',
       SUPABASE_SERVICE_ROLE_KEY: 'k',
+      AUTH_JWT_SECRET: 's'.repeat(32),
       AI_API_URL: 'https://ai.example',
     });
     expect(config.env).toBe('production');
@@ -144,5 +156,44 @@ describe('loadDotenv', () => {
     expect(loadDotenv(path)).toBe(true);
     expect(process.env.MINDSPARK_TEST_NEW).toBe('from-file');
     expect(process.env.MINDSPARK_TEST_EXISTING).toBe('from-shell');
+  });
+});
+
+describe('auth config', () => {
+  it('is relaxed outside production with a random per-process secret', () => {
+    const a = loadConfig({}).auth;
+    expect(a).toMatchObject({
+      enforced: false,
+      payloadHashRequired: false,
+      cookieSecure: false,
+      jwtSecretEphemeral: true,
+      accessTtlSeconds: 900,
+      refreshTtlSeconds: 604_800,
+    });
+    expect(a.jwtSecret).toHaveLength(64);
+    expect(loadConfig({}).auth.jwtSecret).not.toBe(a.jwtSecret);
+  });
+
+  it('is strict in production unless overridden', () => {
+    const prod = {
+      NODE_ENV: 'production',
+      SUPABASE_URL: 'https://x.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY: 'k',
+      AUTH_JWT_SECRET: 'x'.repeat(40),
+    };
+    expect(loadConfig(prod).auth).toMatchObject({
+      enforced: true,
+      payloadHashRequired: true,
+      cookieSecure: true,
+      jwtSecretEphemeral: false,
+      jwtSecret: 'x'.repeat(40),
+    });
+    expect(loadConfig({ ...prod, AUTH_COOKIE_SECURE: 'false' }).auth.cookieSecure).toBe(false);
+  });
+
+  it('parses explicit flags and rejects other values', () => {
+    expect(loadConfig({ AUTH_ENFORCED: 'true' }).auth.enforced).toBe(true);
+    expect(() => parseEnv({ AUTH_ENFORCED: 'yes' })).toThrow('AUTH_ENFORCED');
+    expect(() => parseEnv({ AUTH_ACCESS_TTL_SECONDS: '5' })).toThrow('AUTH_ACCESS_TTL_SECONDS');
   });
 });

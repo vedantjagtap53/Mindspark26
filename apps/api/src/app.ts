@@ -2,6 +2,7 @@ import express, { type Express } from 'express';
 import { API_BASE_PATH } from '@mindspark/shared';
 import type { AppConfig } from './config/index.js';
 import { createErrorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { verifyPayloadHash } from './middleware/payloadHash.js';
 import { createApiRouter, type ApiDeps } from './routes/index.js';
 import { createForecastClient, type ForecastClient } from './services/ai/forecastClient.js';
 import { createRagClient, type RagClient } from './services/ai/ragClient.js';
@@ -20,9 +21,14 @@ export const JSON_BODY_LIMIT = '1mb';
 
 /** Forecast client for Mode A, or `undefined` when AI_API_URL is not set. */
 function forecastClientFromConfig(config: AppConfig): ForecastClient | undefined {
-  const { baseUrl, apiKey, forecastTimeoutMs } = config.ai;
+  const { baseUrl, apiKey, forecastTimeoutMs, forecastCacheMs } = config.ai;
   return baseUrl
-    ? createForecastClient({ baseUrl, apiKey: apiKey ?? '', timeoutMs: forecastTimeoutMs })
+    ? createForecastClient({
+        baseUrl,
+        apiKey: apiKey ?? '',
+        timeoutMs: forecastTimeoutMs,
+        cacheMs: forecastCacheMs,
+      })
     : undefined;
 }
 
@@ -53,7 +59,16 @@ export function createApp(
 ): Express {
   const app = express();
   app.disable('x-powered-by');
-  app.use(express.json({ limit: JSON_BODY_LIMIT }));
+  app.use(
+    express.json({
+      limit: JSON_BODY_LIMIT,
+      // Keep the exact bytes: the payload hash is computed over them, not over re-serialized JSON.
+      verify: (req, _res, buf) => {
+        (req as { rawBody?: Buffer }).rawBody = buf;
+      },
+    }),
+  );
+  app.use(API_BASE_PATH, verifyPayloadHash({ required: config.auth.payloadHashRequired }));
   app.use(
     API_BASE_PATH,
     createApiRouter(config, {
@@ -63,6 +78,8 @@ export function createApp(
       rag: 'rag' in deps ? deps.rag : ragClientFromConfig(config),
       history: 'history' in deps ? deps.history : historyFromConfig(config),
       repositories: 'repositories' in deps ? deps.repositories : repositoriesFromConfig(config),
+      passwordHasher: deps.passwordHasher,
+      logger,
     }),
   );
   app.use(notFoundHandler);

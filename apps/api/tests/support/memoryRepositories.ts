@@ -3,6 +3,7 @@
 /* eslint-disable @typescript-eslint/require-await --
    Methods stay async so that thrown RepositoryErrors become rejected promises, exactly like the real adapter. */
 import { randomUUID } from 'node:crypto';
+import type { ActivityEvent } from '@mindspark/shared';
 import {
   RepositoryError,
   validateSimulationInput,
@@ -12,18 +13,36 @@ import {
   type SimulationRecord,
   type SuitabilityResultRecord,
 } from '../../src/repositories/interfaces/index.js';
+import { createMemoryUserRepositories } from './memoryUserRepositories.js';
 
-type StoredSimulation = Omit<SimulationRecord, 'suitability' | 'explanations'>;
+type StoredSimulation = Omit<SimulationRecord, 'suitability' | 'explanations' | 'owner'>;
 
 export function createMemoryRepositories(): Repositories {
-  let tick = Date.parse('2026-01-01T00:00:00Z');
-  const now = () => new Date((tick += 1000)).toISOString(); // strictly increasing, for ordering
+  // Real time, but strictly increasing even within one millisecond: ordering stays stable and
+  // time filters (listSince) behave as they do on the real database.
+  let last = 0;
+  const now = () => new Date((last = Math.max(Date.now(), last + 1))).toISOString();
   const clone = <T>(v: T): T => structuredClone(v);
 
   const configurations = new Map<string, ProductConfigurationRecord>();
   const simulations = new Map<string, StoredSimulation>();
   const verdicts = new Map<string, SuitabilityResultRecord>();
   const explanations = new Map<string, ExplanationRecord[]>();
+  const events: ActivityEvent[] = [];
+  const userRepos = createMemoryUserRepositories();
+
+  /** A stored simulation as the interface returns it: verdict, explanations and owner joined in. */
+  const full = async (s: StoredSimulation): Promise<SimulationRecord> => {
+    const user = s.userId ? await userRepos.users.getById(s.userId) : null;
+    return clone({
+      ...s,
+      owner: user ? { id: user.id, email: user.email, displayName: user.displayName } : null,
+      suitability: verdicts.get(s.id) ?? null,
+      explanations: explanations.get(s.id) ?? [],
+    } as SimulationRecord);
+  };
+  const newestFirst = (list: StoredSimulation[]) =>
+    [...list].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   return {
     productConfigurations: {
@@ -43,6 +62,9 @@ export function createMemoryRepositories(): Repositories {
         validateSimulationInput(input);
         const configuration = configurations.get(input.configurationId);
         if (!configuration) throw new RepositoryError('invalid_reference', 'Unknown configuration');
+        if (input.userId && !(await userRepos.users.getById(input.userId))) {
+          throw new RepositoryError('invalid_reference', 'Unknown user');
+        }
         const id = randomUUID();
         const ts = now();
         const { riskResults, configurationId: _configurationId, ...fields } = clone(input);
@@ -57,12 +79,25 @@ export function createMemoryRepositories(): Repositories {
       },
       async getById(id) {
         const s = simulations.get(id);
-        if (!s) return null;
-        return clone({
-          ...s,
-          suitability: verdicts.get(id) ?? null,
-          explanations: explanations.get(id) ?? [],
-        } as SimulationRecord);
+        return s ? full(s) : null;
+      },
+      async listRecent(limit) {
+        return Promise.all(
+          newestFirst([...simulations.values()])
+            .slice(0, limit)
+            .map(full),
+        );
+      },
+      async listByUser(userId, limit) {
+        const mine = [...simulations.values()].filter((s) => s.userId === userId);
+        return Promise.all(newestFirst(mine).slice(0, limit).map(full));
+      },
+      async listSince(sinceIso, limit) {
+        const recent = [...simulations.values()].filter((s) => s.createdAt >= sinceIso);
+        return Promise.all(newestFirst(recent).slice(0, limit).map(full));
+      },
+      async count() {
+        return simulations.size;
       },
     },
 
@@ -91,5 +126,32 @@ export function createMemoryRepositories(): Repositories {
         return id;
       },
     },
+
+    activity: {
+      async record({ userId, actorEmail, event, detail }) {
+        const user = userId ? await userRepos.users.getById(userId) : null;
+        events.push({
+          id: randomUUID(),
+          createdAt: now(),
+          event,
+          user: user ? { id: user.id, email: user.email, displayName: user.displayName } : null,
+          actorEmail,
+          detail: clone(detail),
+        });
+      },
+      async listRecent(limit) {
+        return clone([...events].reverse().slice(0, limit));
+      },
+      async listSince(sinceIso, limit) {
+        return clone(
+          [...events]
+            .reverse()
+            .filter((e) => e.createdAt >= sinceIso)
+            .slice(0, limit),
+        );
+      },
+    },
+
+    ...userRepos,
   };
 }

@@ -10,8 +10,9 @@ import type { RagClient } from './ragClient.js';
 import { buildRagContext } from './simulationContext.js';
 
 export interface AdvisoryService {
-  explain(simulationId: string): Promise<ExplainResponse>;
-  chat(request: ChatRequest): Promise<ChatResponse>;
+  /** `ownerId` is the signed-in account: another account's run is reported as not found. */
+  explain(simulationId: string, ownerId?: string): Promise<ExplainResponse>;
+  chat(request: ChatRequest, ownerId?: string): Promise<ChatResponse>;
 }
 
 export interface AdvisoryDeps {
@@ -33,9 +34,9 @@ function requireRag(rag: RagClient | undefined): RagClient {
 
 export function createAdvisoryService(deps: AdvisoryDeps): AdvisoryService {
   return {
-    async explain(simulationId) {
+    async explain(simulationId, ownerId) {
       const rag = requireRag(deps.rag);
-      const record = deps.records.get(simulationId);
+      const record = deps.records.get(simulationId, ownerId);
       const context = buildRagContext(record);
       const out = await rag.explain(context);
       if (out.simulation_id !== simulationId || out.verdict !== context.suitability.verdict) {
@@ -79,9 +80,9 @@ export function createAdvisoryService(deps: AdvisoryDeps): AdvisoryService {
       return response;
     },
 
-    async chat({ simulationId, question, history }) {
+    async chat({ simulationId, question, history }, ownerId) {
       const rag = requireRag(deps.rag);
-      const context = buildRagContext(deps.records.get(simulationId));
+      const context = buildRagContext(deps.records.get(simulationId, ownerId));
       const out = await rag.chat(context, question, history);
       if (out.simulation_id !== simulationId) {
         throw new AppError('AI_INVALID_RESPONSE', 'The chat answer is for a different simulation');

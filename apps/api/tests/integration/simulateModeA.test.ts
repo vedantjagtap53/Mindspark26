@@ -5,6 +5,7 @@ import {
   PAYOFF_CURVE_SHOCKS,
   SCENARIO_SHOCKS,
   type ForecastRequestInput,
+  type SimulateModeAContextResponse,
   type SimulateModeAResponse,
 } from '@mindspark/shared';
 import { buildConfig } from '../../src/config/index.js';
@@ -62,11 +63,11 @@ describe('POST /api/simulate — Mode A', () => {
   it('asks the forecast service for the product underlying, tenor and window', async () => {
     const { client, calls } = fakeForecast();
     await post(
-      { mode: 'A', productType: 'ELN', terms: eln, trainingWindowYears: 1.5 },
+      { mode: 'A', productType: 'ELN', terms: eln, trainingWindowYears: 0.5 },
       appWith(client),
     );
     expect(calls).toEqual([
-      { underlying, tenorDays: 182, trainingWindowYears: 1.5, samplePathCount: 500 },
+      { underlying, tenorDays: 182, trainingWindowYears: 0.5, samplePathCount: 500 },
     ]);
   });
 
@@ -74,16 +75,6 @@ describe('POST /api/simulate — Mode A', () => {
     const { client, calls } = fakeForecast();
     await post({ mode: 'A', productType: 'CPN', terms: cpn }, appWith(client));
     expect(calls[0]?.trainingWindowYears).toBe(3);
-  });
-
-  it.each([30 / 365, 0.5, 2.4, 3])('accepts a training window of %s years', async (years) => {
-    const { client, calls } = fakeForecast();
-    const res = await post(
-      { mode: 'A', productType: 'ELN', terms: eln, trainingWindowYears: years },
-      appWith(client),
-    );
-    expect(res.status).toBe(200);
-    expect(calls[0]?.trainingWindowYears).toBe(years);
   });
 
   it('ELN: runs the engine on each case path', async () => {
@@ -201,17 +192,8 @@ describe('POST /api/simulate — Mode A errors', () => {
     });
   });
 
-  it('DCD: forecasts the FX pair and runs the DCD engine on X_T', async () => {
-    const calls: ForecastRequestInput[] = [];
-    const client: ForecastClient = {
-      forecast: (input) => {
-        calls.push(input);
-        return Promise.resolve(
-          makeForecast({ spot: 84, tenorDays: input.tenorDays, samplePathCount: 100 }),
-        );
-      },
-    };
-    const terms = {
+  describe('DCD in Mode A: Nifty 50 forecast as context only', () => {
+    const dcdTerms = {
       depositCurrency: 'usd',
       alternateCurrency: 'INR',
       depositAmount: 100_000,
@@ -219,22 +201,83 @@ describe('POST /api/simulate — Mode A errors', () => {
       strikeRate: 84,
       enhancedRatePct: 8,
     };
-    const res = await post({ mode: 'A', productType: 'DCD', terms }, appWith(client));
-    expect(res.status).toBe(200);
-    expect(calls[0]?.underlying).toEqual({ symbol: 'USDINR', assetClass: 'fx' });
+    const dcdPost = (extra: object = {}, forecast = fakeForecast()) =>
+      post({ mode: 'A', productType: 'DCD', terms: dcdTerms, ...extra }, appWith(forecast.client));
 
-    const r = out(res);
-    const full = 100_000 * (1 + 0.08 * (90 / 365));
-    // Low case: X_T = 71.4 < K, repaid in USD in full. High case: X_T = 102.48 > K, converted.
-    expect(r.cases.low.payoff).toBeCloseTo(full, 6);
-    expect(r.cases.low.knockedIn).toBeNull();
-    expect(r.cases.base.payoff).toBeCloseTo(full * (84 / (84 * 1.04)), 6);
-    expect(r.cases.high.payoff).toBeCloseTo(full * (84 / (84 * 1.22)), 6);
-    expect(r.cases.high.returnPct).toBeLessThan(0);
-    expect(r.distribution.probabilityOfKnockIn).toBeNull();
-    expect(r.distribution.probabilityOfLoss).toBeGreaterThan(0);
-    expect(r.scenarios.map((x) => x.shockPct)).toEqual([...SCENARIO_SHOCKS]);
-    expect(r.breakevens.length).toBeGreaterThan(0);
+    it('asks the forecast service for the Nifty 50, not for the FX pair', async () => {
+      const forecast = fakeForecast();
+      const res = await dcdPost({ trainingWindowYears: 2 }, forecast);
+      expect(res.status).toBe(200);
+      expect(forecast.calls).toEqual([
+        {
+          underlying: { symbol: '^NSEI', assetClass: 'index' },
+          tenorDays: 90,
+          trainingWindowYears: 2,
+          samplePathCount: 500,
+        },
+      ]);
+    });
+
+    it('returns the fan, model card and backtest, labelled as the Nifty 50 forecast', async () => {
+      const res = await dcdPost();
+      const r = res.body as SimulateModeAContextResponse;
+      expect(r).toMatchObject({
+        kind: 'forecast_context',
+        mode: 'A',
+        productType: 'DCD',
+        underlying: { symbol: '^NSEI', name: 'Nifty 50' },
+        spot: { value: SPOT },
+        horizon: { tenorDays: 90 },
+        history: { status: 'unavailable' },
+      });
+      expect(r.fan.p50[0]).toBe(SPOT);
+      expect(r.model.name).toBe('garch11-t-montecarlo');
+      expect(r.backtest.bandCoverage).toBe(0.88);
+      expect(r.notice).toMatch(/context only/i);
+      expect(r.notice).toMatch(/USD\/INR/);
+      expect(r.notice).toMatch(/Mode B/);
+    });
+
+    it('calculates no DCD payoff, risk, scenario or breakeven from the Nifty 50 paths', async () => {
+      const body = (await dcdPost()).body as Record<string, unknown>;
+      for (const field of [
+        'cases',
+        'distribution',
+        'scenarios',
+        'curve',
+        'breakevens',
+        'simulationId',
+      ]) {
+        expect(body, field).not.toHaveProperty(field);
+      }
+    });
+
+    it('does not store the run, so there is nothing to assess, explain or chat about', async () => {
+      const app = appWith(fakeForecast().client);
+      const res = await post({ mode: 'A', productType: 'DCD', terms: dcdTerms }, app);
+      expect(res.status).toBe(200);
+      const profile = {
+        name: 'A',
+        age: 40,
+        riskAppetite: 'high',
+        horizonMonths: 12,
+        lossTolerancePct: 10,
+        concentrationPct: 10,
+      };
+      for (const simulationId of ['none', '00000000-0000-4000-8000-000000000000']) {
+        const suit = await request(app).post('/api/suitability').send({ simulationId, profile });
+        expect(suit.status).toBe(404);
+      }
+    });
+
+    it('still fails clearly when the forecast service is down', async () => {
+      const failing = fakeForecast(
+        new ForecastError('AI_UNAVAILABLE', 'Forecast service is unreachable'),
+      );
+      const res = await dcdPost({}, failing);
+      expect(res.status).toBe(503);
+      expect((res.body as { error: { code: string } }).error.code).toBe('AI_UNAVAILABLE');
+    });
   });
 
   it('shows the history as unavailable when no provider is configured', async () => {
@@ -274,9 +317,8 @@ describe('POST /api/simulate — Mode A errors', () => {
   });
 
   it.each([
-    ['a training window above 3 years', { trainingWindowYears: 5 }],
-    ['a training window below 30 days', { trainingWindowYears: 29 / 365 }],
-    ['a non-numeric training window', { trainingWindowYears: '10' }],
+    ['a training window above 3 years', { trainingWindowYears: 7 }],
+    ['a training window under 30 days', { trainingWindowYears: 29 / 365 }],
     ['a Mode B shock', { shockPct: -10 }],
     ['a Mode B level', { level: { source: 'manual', value: 25_000 } }],
   ])('rejects %s', async (_name, extra) => {

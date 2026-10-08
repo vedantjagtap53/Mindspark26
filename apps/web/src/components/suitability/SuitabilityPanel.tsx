@@ -4,6 +4,7 @@
 import { AlertTriangle, CheckCircle2, ListChecks, OctagonAlert } from 'lucide-react';
 import type { SuitabilityVerdict } from '@mindspark/shared';
 import { PRODUCTS } from '../../constants/products';
+import { revealStyle } from '../../motion/reveal';
 import type { ProductType, ProfileForm } from '../../state/forms';
 import type { SessionRun } from '../../types/session';
 import { formatPct } from '../../utils/format';
@@ -42,7 +43,8 @@ export function SuitabilityPanel({ product, profile, run }: Props) {
         title="Suitability verdict"
         aside={
           <span
-            className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase ${
+            key={result?.verdict ?? 'pending'}
+            className={`${result ? 'badge-in ' : ''}text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase ${
               result
                 ? VERDICT_BADGE[result.verdict]
                 : 'bg-[var(--well-bg)] text-[var(--ink-muted)] border border-[var(--border-color)]'
@@ -80,8 +82,12 @@ export function SuitabilityPanel({ product, profile, run }: Props) {
             </p>
           ) : (
             <ul className="space-y-1.5" aria-label="Suitability flags">
-              {result.flags.map((f) => (
-                <li key={f.rule} className="flex items-start gap-1.5 text-xs">
+              {result.flags.map((f, i) => (
+                <li
+                  key={f.rule}
+                  className="reveal-up flex items-start gap-1.5 text-xs"
+                  style={revealStyle(i)}
+                >
                   {f.severity === 'not_suitable' ? (
                     <OctagonAlert
                       className="w-4 h-4 shrink-0 mt-0.5 text-[var(--status-breach-text)]"

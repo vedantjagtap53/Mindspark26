@@ -42,7 +42,11 @@ export function createMarketData(config: AppConfig, logger: Logger): MarketData 
   return {
     service: createMarketDataService({
       live,
-      fx: createFrankfurterProvider({ apiUrl: fx.apiUrl, maxAgeDays: fx.maxAgeDays }),
+      fx: createFrankfurterProvider({
+        apiUrl: fx.apiUrl,
+        maxAgeDays: fx.maxAgeDays,
+        cacheMs: fx.cacheMs,
+      }),
     }),
     stream,
     close,

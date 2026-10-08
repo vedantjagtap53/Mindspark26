@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import {
   BarChart3,
   Compass,
@@ -8,6 +9,7 @@ import {
   Sliders,
   Sparkles,
 } from 'lucide-react';
+import { BRAND_NAME } from '../constants/brand';
 
 export type Stage = 'MANDATE' | 'STRUCTURE' | 'SIMULATE' | 'OUTCOMES' | 'VERDICT';
 
@@ -28,6 +30,8 @@ interface Props {
   onPrint?: () => void;
   loading: boolean;
   elapsedSeconds: number;
+  /** Account controls at the right end of the bar. */
+  trailing?: ReactNode;
 }
 
 export function TopNav({
@@ -38,12 +42,15 @@ export function TopNav({
   onPrint,
   loading,
   elapsedSeconds,
+  trailing,
 }: Props) {
   return (
     <header className="no-print sticky top-0 z-20 border-b border-[var(--border-color)] bg-[var(--canvas-bg)]/95 backdrop-blur">
       <div className="max-w-6xl mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center gap-3 justify-between">
         <div>
-          <span className="font-serif text-lg font-bold text-[var(--ink-primary)]">FinStrukt</span>
+          <span className="font-serif text-lg font-bold text-[var(--ink-primary)]">
+            {BRAND_NAME}
+          </span>
           <span className="block text-[11px] font-mono text-[var(--ink-muted)]">
             Structured products suitability simulator
           </span>
@@ -97,7 +104,18 @@ export function TopNav({
           >
             <Printer className="w-3.5 h-3.5" aria-hidden />
           </button>
+          {trailing}
         </div>
+      </div>
+      {/* Progress through the five stages: a thin line that fills as the user moves on. */}
+      <div aria-hidden className="h-0.5 bg-[var(--border-subtle)]">
+        <div
+          data-testid="stage-progress"
+          className="h-full origin-left bg-[var(--accent-primary)] transition-transform duration-[var(--motion-slow)] ease-[var(--ease-out)]"
+          style={{
+            transform: `scaleX(${(STAGES.findIndex((s) => s.id === stage) + 1) / STAGES.length})`,
+          }}
+        />
       </div>
     </header>
   );

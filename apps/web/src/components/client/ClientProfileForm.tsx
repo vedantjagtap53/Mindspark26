@@ -1,7 +1,7 @@
 // Client profile (PRD §7.1): risk appetite, horizon, loss tolerance, concentration.
 import { Compass } from 'lucide-react';
 import type { ProfileForm, RiskAppetite } from '../../state/forms';
-import { Field, Segmented, TextInput, Tile } from '../ui';
+import { Segmented, Tile } from '../ui';
 
 interface Props {
   profile: ProfileForm;
@@ -72,26 +72,6 @@ export function ClientProfileForm({ profile, onChange }: Props) {
             Risk classification and mandate limits used by the suitability check
           </p>
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="Client name" htmlFor="client-name">
-          <TextInput
-            id="client-name"
-            value={profile.name}
-            onChange={(v) => set('name', v)}
-            placeholder="e.g. Asha Rao"
-            maxLength={120}
-          />
-        </Field>
-        <Field label="Client age" htmlFor="client-age">
-          <TextInput
-            id="client-age"
-            value={String(profile.age)}
-            onChange={(v) => set('age', Number(v.replace(/\D/g, '')) || 0)}
-            maxLength={3}
-          />
-        </Field>
       </div>
 
       <div>

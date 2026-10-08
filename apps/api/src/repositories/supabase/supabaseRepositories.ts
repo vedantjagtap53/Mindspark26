@@ -14,7 +14,12 @@ import {
   type SuitabilityFlag,
 } from '../interfaces/index.js';
 import { fromDb, toDb, toIso } from './mapping.js';
-import { unwrap, type Db } from './supabaseClient.js';
+import { createSupabaseActivityRepository } from './supabaseActivityRepository.js';
+import { toRepositoryError, unwrap, type Db } from './supabaseClient.js';
+import {
+  createSupabaseRefreshTokenRepository,
+  createSupabaseUserRepository,
+} from './supabaseUserRepositories.js';
 
 // ---- rows as returned by PostgREST ----
 
@@ -62,8 +67,16 @@ interface ExplanationRow {
 /** PostgREST embeds a one-to-one relation as an object; older versions return a one-element list. */
 type OneToOne<T> = T | T[] | null;
 
+interface OwnerRow {
+  id: string;
+  email: string;
+  display_name: string;
+}
+
 interface SimulationRow {
   id: string;
+  user_id: string | null;
+  owner: OneToOne<OwnerRow>;
   configuration: ConfigurationRow;
   mode: SimulationMode;
   profile_snapshot: ClientProfileSnapshot | null;
@@ -91,10 +104,11 @@ type Key = { id: string };
 const CONFIGURATION_COLUMNS =
   'id, product_type, underlying_symbol, deposit_currency, alternate_currency, tenor_days, notional, terms, created_at';
 const SIMULATION_SELECT = `
-  id, mode, profile_snapshot,
+  id, user_id, mode, profile_snapshot,
   level_value, level_source, level_as_of, shock_pct, shocked_level,
   training_window_years, forecast_meta, path_count, probability_of_loss, probability_of_knock_in,
   payoff_p5, payoff_p50, payoff_p95, created_at,
+  owner:app_users(id, email, display_name),
   configuration:product_configurations!inner(${CONFIGURATION_COLUMNS}),
   risk_results(scenario, percentile, terminal, path_min, payoff, return_pct, loss_amount, knocked_in, details, created_at),
   suitability_results(id, verdict, flags, rules_version, created_at),
@@ -137,9 +151,12 @@ function required<T>(value: T | null, field: string, id: string): T {
 function toSimulation(r: SimulationRow): SimulationRecord {
   const { id } = r;
   const verdict = one(r.suitability_results);
+  const owner = one(r.owner);
   const common = {
     id,
     createdAt: toIso(r.created_at),
+    userId: r.user_id,
+    owner: owner ? { id: owner.id, email: owner.email, displayName: owner.display_name } : null,
     profileSnapshot: r.profile_snapshot,
     configuration: toConfiguration(r.configuration),
     riskResults: r.risk_results.map(toRisk),
@@ -152,15 +169,13 @@ function toSimulation(r: SimulationRow): SimulationRecord {
           createdAt: toIso(verdict.created_at),
         }
       : null,
-    explanations: r.explanations.map(
-      (e): ExplanationRecord => ({
-        id: e.id,
-        text: e.text,
-        model: e.model,
-        sources: e.sources,
-        createdAt: toIso(e.created_at),
-      }),
-    ),
+    explanations: r.explanations.map((e): ExplanationRecord => ({
+      id: e.id,
+      text: e.text,
+      model: e.model,
+      sources: e.sources,
+      createdAt: toIso(e.created_at),
+    })),
   };
   if (r.mode === 'A') {
     return {
@@ -228,6 +243,7 @@ export function createSupabaseRepositories(db: Db): Repositories {
       async record(input) {
         validateSimulationInput(input);
         const common = {
+          user_id: input.userId,
           configuration_id: input.configurationId,
           mode: input.mode,
           profile_snapshot: input.profileSnapshot,
@@ -280,6 +296,49 @@ export function createSupabaseRepositories(db: Db): Repositories {
         );
         return row ? toSimulation(row) : null;
       },
+      async listRecent(limit) {
+        const rows = unwrap<SimulationRow[]>(
+          await db
+            .from('simulations')
+            .select(SIMULATION_SELECT)
+            .order('created_at', { ascending: false })
+            .order('scenario', { referencedTable: 'risk_results' })
+            .order('created_at', { referencedTable: 'explanations' })
+            .limit(limit),
+        );
+        return rows.map(toSimulation);
+      },
+      async listByUser(userId, limit) {
+        const rows = unwrap<SimulationRow[]>(
+          await db
+            .from('simulations')
+            .select(SIMULATION_SELECT)
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .order('scenario', { referencedTable: 'risk_results' })
+            .order('created_at', { referencedTable: 'explanations' })
+            .limit(limit),
+        );
+        return rows.map(toSimulation);
+      },
+      async listSince(sinceIso, limit) {
+        const rows = unwrap<SimulationRow[]>(
+          await db
+            .from('simulations')
+            .select(SIMULATION_SELECT)
+            .gte('created_at', sinceIso)
+            .order('created_at', { ascending: false })
+            .order('scenario', { referencedTable: 'risk_results' })
+            .order('created_at', { referencedTable: 'explanations' })
+            .limit(limit),
+        );
+        return rows.map(toSimulation);
+      },
+      async count() {
+        const res = await db.from('simulations').select('id', { count: 'exact', head: true });
+        if (res.error) throw toRepositoryError(res.error, res.status);
+        return res.count ?? 0;
+      },
     },
 
     suitabilityResults: {
@@ -312,5 +371,9 @@ export function createSupabaseRepositories(db: Db): Repositories {
         return row.id;
       },
     },
+
+    activity: createSupabaseActivityRepository(db),
+    users: createSupabaseUserRepository(db),
+    refreshTokens: createSupabaseRefreshTokenRepository(db),
   };
 }

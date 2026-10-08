@@ -150,7 +150,7 @@ def test_running_service_picks_up_the_refreshed_file():
             assert getattr(e, "code", None) == "DATA_STALE", e
         run(p, NEW)
         os.utime(p, None)
-        r = svc.forecast("^NSEI", "index", 90, 10, 100)
+        r = svc.forecast("^NSEI", "index", 90, 3, 100)
         assert r["data"]["asOf"] == "2026-10-06" and r["data"]["spot"] == 22650.25
     finally:
         os.environ.pop("DATA_PATH", None)
@@ -160,7 +160,8 @@ def test_cli_fails_without_a_token():
     p = tmp_csv()
     saved = os.environ.pop("UPSTOX_ACCESS_TOKEN", None)
     try:
-        assert rd.main(["--csv", str(p)]) == 1
+        # Yahoo is the default source and needs no token, so the Upstox source is named explicitly.
+        assert rd.main(["--csv", str(p), "--source", "upstox"]) == 1
     finally:
         if saved is not None:
             os.environ["UPSTOX_ACCESS_TOKEN"] = saved

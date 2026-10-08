@@ -93,7 +93,7 @@ function trackedRepositories() {
 }
 
 describe('client profile on /api/suitability', () => {
-  it('requires a name and an age within range', async () => {
+  it('takes a name and an age only if they are within range, and does not need them', async () => {
     const app = appWith(createMemoryRepositories());
     const simulationId = await simulate(app);
     const send = (p: Record<string, unknown>) =>
@@ -101,9 +101,8 @@ describe('client profile on /api/suitability', () => {
 
     const { name: _name, ...noName } = profile;
     const { age: _age, ...noAge } = profile;
+    const { name: _n, age: _a, ...rulesOnly } = profile;
     for (const bad of [
-      noName,
-      noAge,
       { ...profile, name: '   ' },
       { ...profile, name: 'x'.repeat(121) },
       { ...profile, age: 17 },
@@ -115,6 +114,10 @@ describe('client profile on /api/suitability', () => {
       expect(errorBody(res).code).toBe('VALIDATION_ERROR');
     }
     expect((await send(profile)).status).toBe(200);
+    // The desk sends neither; each may also be left out on its own.
+    for (const ok of [rulesOnly, noName, noAge]) {
+      expect((await send(ok)).status, JSON.stringify(ok)).toBe(200);
+    }
   });
 
   it('gives the same verdict whatever the name and age are', async () => {

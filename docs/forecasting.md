@@ -4,7 +4,7 @@ Source: `PRD.md` §7.3. The forecast service is **owned by the AI/ML developer**
 
 ## Method (agreed, implemented by the AI/ML developer)
 
-1. Load daily closes for the underlying over the training window, chosen by the RM: 30 days to 3 years (default 3 years; changed from "10 years, optional 5" on 2026-10-04 at the repo owner's request, not yet agreed with the forecast owner). A window this short may not include the COVID period, and a very short one leaves too few returns for a stable GARCH fit.
+1. Load daily closes for the underlying over the training window, chosen by the RM: 30 days to 3 years (default 3 years), as in `PRD.md` §7.3. The window is the last `round(years × 365)` calendar days before the last close. Implemented in the forecast service on 2026-10-07 at the repo owner's request (it accepted only 5 or 10 years before); the AI/ML developer should review it. A window this short may not include the COVID period, and a very short one leaves too few returns for a stable GARCH fit: 30 days is about 19 returns, the fit reaches the stationarity boundary (alpha + beta ≈ 0.999) and the Student-t degrees of freedom become very large, so treat the shortest windows as indicative only.
 2. Compute daily log returns `r_t = ln(P_t / P_{t-1})`.
 3. Fit GARCH(1,1) with Student-t errors (e.g. Python `arch`).
 4. `tradingDays = round(tenorDays × 252 / 365)`.

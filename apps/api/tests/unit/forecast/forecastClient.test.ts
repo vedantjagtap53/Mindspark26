@@ -78,3 +78,74 @@ describe('forecast client', () => {
     expect((await codeOf(client(fetchImpl).forecast(input))).code).toBe('AI_INVALID_RESPONSE');
   });
 });
+
+describe('forecast cache', () => {
+  /** A forecast service that counts calls and can be told to fail. */
+  function service() {
+    const state = { calls: 0, status: 200 };
+    const fetchImpl = (() => {
+      state.calls += 1;
+      return Promise.resolve(
+        state.status === 200 ? jsonResponse(makeForecast()) : jsonResponse({}, state.status),
+      );
+    }) as unknown as typeof fetch;
+    return { state, fetchImpl };
+  }
+  const cachedClient = (fetchImpl: typeof fetch, now: () => Date, cacheMs?: number) =>
+    createForecastClient({ baseUrl: 'https://ai.example', apiKey: 'k', fetchImpl, now, cacheMs });
+
+  it('asks the service once for identical requests, including one spelling out the defaults', async () => {
+    const { state, fetchImpl } = service();
+    const c = cachedClient(fetchImpl, () => FIXTURE_NOW);
+    const first = await c.forecast(input);
+    const again = await c.forecast({ ...input, trainingWindowYears: 3 });
+    expect(again).toBe(first);
+    expect(state.calls).toBe(1);
+  });
+
+  it('asks again for a different request', async () => {
+    const { state, fetchImpl } = service();
+    const c = cachedClient(fetchImpl, () => FIXTURE_NOW);
+    await c.forecast(input);
+    await c.forecast({ ...input, trainingWindowYears: 1 });
+    expect(state.calls).toBe(2);
+  });
+
+  it('asks again once the cached forecast has expired', async () => {
+    const { state, fetchImpl } = service();
+    let t = FIXTURE_NOW.getTime();
+    const c = cachedClient(fetchImpl, () => new Date(t), 60_000);
+    await c.forecast(input);
+    t += 59_000;
+    await c.forecast(input);
+    expect(state.calls).toBe(1);
+    t += 1_000;
+    await c.forecast(input);
+    expect(state.calls).toBe(2);
+  });
+
+  it('does not keep a failure: the next request tries the service again', async () => {
+    const { state, fetchImpl } = service();
+    const c = cachedClient(fetchImpl, () => FIXTURE_NOW);
+    state.status = 503;
+    expect((await codeOf(c.forecast(input))).code).toBe('AI_UNAVAILABLE');
+    state.status = 200;
+    await expect(c.forecast(input)).resolves.toBeDefined();
+    expect(state.calls).toBe(2);
+  });
+
+  it('hands out a frozen forecast, so no request can change the shared copy', async () => {
+    const { fetchImpl } = service();
+    const f = await cachedClient(fetchImpl, () => FIXTURE_NOW).forecast(input);
+    expect(Object.isFrozen(f)).toBe(true);
+    expect(Object.isFrozen(f.samplePaths[0])).toBe(true);
+  });
+
+  it('calls the service every time when the cache is off', async () => {
+    const { state, fetchImpl } = service();
+    const c = cachedClient(fetchImpl, () => FIXTURE_NOW, 0);
+    await c.forecast(input);
+    await c.forecast(input);
+    expect(state.calls).toBe(2);
+  });
+});

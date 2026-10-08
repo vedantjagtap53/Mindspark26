@@ -12,10 +12,10 @@ A simulator that relationship managers (RMs) use to test structured products aga
 Pick product → enter terms → enter client → choose Mode A or B → payoff + risk → verdict → explanation → chat
 ```
 
-- **Mode A (forecast):** the forecast service simulates the underlying (GARCH(1,1) Monte Carlo on a training window the RM picks, 30 days to 3 years) and returns low (P5), base (P50) and high (P95) paths. The result is always a range, never a single price.
+- **Mode A (forecast):** the forecast service simulates the underlying (GARCH(1,1) Monte Carlo on a training window of 30 days to 3 years, chosen by the RM) and returns low (P5), base (P50) and high (P95) paths. The result is always a range, never a single price.
 - **Mode B (shock):** the RM starts from a live, reference or typed level and applies a shock such as −10%.
 - **Both modes use the same deterministic payoff engine** (`apps/api/src/engines/payoff`). The backend does every calculation and the suitability rules; the browser and the AI never decide a number.
-- **The client** is entered for each run: name, age, risk appetite, investment horizon, loss tolerance and concentration. There are no saved profiles. Name and age are display-only: no rule reads them, they are stored with the audit record, and they are never sent to the AI service.
+- **The client** is entered for each run: risk appetite, investment horizon, loss tolerance and concentration. There are no saved profiles, and the client's name and age are not asked (since 2026-10-08).
 - **Verdict rules** are in [docs/suitability-rules.md](docs/suitability-rules.md); payoff formulas in [docs/product-formulas.md](docs/product-formulas.md).
 
 ## Architecture
@@ -35,8 +35,13 @@ React web app (3000) ──/api──▶ Node.js API (4000) ──▶ forecast s
 | Database schema     | `supabase/`         | SQL migrations and Supabase CLI config                            |
 | Forecast service    | `services/forecast` | Python; owned by the AI/ML developer                              |
 | Explanation service | `services/rag`      | Python; owned by the AI/ML developer                              |
+| Browser tests       | `tests/e2e`         | Playwright journeys against the real web app and API              |
+| Dev scripts         | `scripts/`          | `npm run setup` and the service launchers                         |
+| Documentation       | `docs/`             | Specifications, formulas, rules, decisions and design archive     |
 
-More detail: [ARCHITECTURE.md](ARCHITECTURE.md), [API_SPEC.md](API_SPEC.md), [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md).
+The root keeps only what you need first: this README, [PRD.md](PRD.md), [CLAUDE.md](CLAUDE.md), [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and the workspace config.
+
+More detail: [ARCHITECTURE.md](docs/ARCHITECTURE.md), [API_SPEC.md](docs/API_SPEC.md), [DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md).
 
 ## Getting started
 
@@ -71,6 +76,8 @@ Root `.env` (copied from [.env.example](.env.example)):
 | `FINNHUB_API_KEY` or `UPSTOX_ACCESS_TOKEN`  | Optional live level in Mode B. Without one, the RM types the level.                                                                               |
 | `MARKET_HISTORY_PROVIDER`                   | `yahoo` shows price history behind the Mode A fan chart; default `none`.                                                                          |
 | `SUITABILITY_CONCENTRATION_LIMIT_PCT`       | Concentration flag threshold, default 25.                                                                                                         |
+| `AUTH_JWT_SECRET`                           | Signs access tokens (32+ characters). Set by `setup`. Required in production.                                                                     |
+| `AUTH_ENFORCED`, `PAYLOAD_HASH_REQUIRED`    | Default on in production, off in development. See Accounts below.                                                                                 |
 
 `services/rag/.env` needs `GOOGLE_API_KEY` (a Gemini key). After adding it, build the knowledge-base index once with `npm run rag:index`, and again whenever you edit `services/rag/rag/knowledge/`.
 
@@ -90,6 +97,23 @@ Put the project URL and the service-role (or `sb_secret_…`) key in `.env`. **K
 
 For a local database run `npx supabase start` (needs Docker).
 
+### Accounts and sign-in
+
+Staff sign in with an email and password; sessions use httpOnly cookies (an access token and a rotating refresh token). Accounts live in Supabase, so apply the migrations first. There are two roles:
+
+| Role          | Can do                                                                                                    |
+| ------------- | --------------------------------------------------------------------------------------------------------- |
+| `RM` ("User") | Run simulations, suitability checks, explanations and chat; see their own saved runs.                     |
+| `ADMIN`       | Everything a user can do, plus every account's runs, the activity log and analytics, and user management. |
+
+Anyone can register as a user. Create the first admin from your terminal, then sign in on the same page (users and admins share it) to reach the admin console and create further admin accounts:
+
+```sh
+ADMIN_EMAIL=you@bank.com ADMIN_PASSWORD='Strong-Passw0rd' npm run seed:admin
+```
+
+In development, sign-in is optional (the simulator is open to anonymous visitors, and the sign-in button is in the settings menu); in production (`NODE_ENV=production`) it is required. Every user can switch between light, dark and system themes, and turn the custom cursor off, in the account menu; the choice is saved to their account. The web app sends a SHA-256 hash of every request body (`X-Payload-Hash`) and the API checks it. Decision record and known limits: [docs/decisions/2026-10-07-auth-rbac.md](docs/decisions/2026-10-07-auth-rbac.md).
+
 ## Everyday commands
 
 | Command                                   | What it does                                      |
@@ -103,11 +127,11 @@ For a local database run `npx supabase start` (needs Docker).
 
 Python tests run with each service's own environment, e.g. from `services/forecast`: `.venv/Scripts/python -m pytest` on Windows, `.venv/bin/python -m pytest` elsewhere.
 
-Tests against a real database are skipped unless you set `SUPABASE_TEST_URL`, `SUPABASE_TEST_SERVICE_ROLE_KEY` and `SUPABASE_TEST_DB_URL` (a **local** database; the suite empties its tables). See [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md).
+Tests against a real database are skipped unless you set `SUPABASE_TEST_URL`, `SUPABASE_TEST_SERVICE_ROLE_KEY` and `SUPABASE_TEST_DB_URL` (a **local** database; the suite empties its tables). See [DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md).
 
 ## API
 
-All under `/api`: `GET /health`, `POST /configure`, `POST /simulate`, `POST /suitability`, `POST /explain`, `POST /chat`, and a WebSocket `/live` for the price ticker. Request and response shapes: [API_SPEC.md](API_SPEC.md).
+All under `/api`: `GET /health`, `POST /configure`, `POST /simulate`, `POST /suitability`, `POST /explain`, `POST /chat`, a WebSocket `/live` for the price ticker, and the account routes `/auth/*`, `/admin/*` and `/audit/*`. Request and response shapes: [API_SPEC.md](docs/API_SPEC.md).
 
 ## Keeping Mode A fresh
 
@@ -124,13 +148,11 @@ Mode A fails with `DATA_STALE` when the forecast service's price file (`services
 | `AI_UNAVAILABLE` on a forecast                                                | The forecast service isn't running, or its key doesn't match `AI_API_KEY`. Start `npm run dev:forecast`.                                         |
 | `DATA_STALE`                                                                  | See "Keeping Mode A fresh".                                                                                                                      |
 | `http://127.0.0.1:3000` doesn't load                                          | The dev server may listen on IPv6 only. Use `http://localhost:3000`.                                                                             |
-| Run button disabled                                                           | The client's name and age must be entered, and the product terms must be valid.                                                                  |
+| Run button disabled                                                           | The product terms must be valid, and Mode B needs a starting level.                                                                              |
 
 ## Project rules and status
 
 - [PRD.md](PRD.md) is the source of truth for requirements. Changes to architecture, API contracts, the database design or financial rules need explicit approval. See [CLAUDE.md](CLAUDE.md).
 - The Mode A forecast contract between this repo and the AI/ML developer is [docs/forecasting.md](docs/forecasting.md).
 - What is built, what is verified and what is still open: [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md). Open decisions: [docs/decisions/](docs/decisions/).
-- Security notes: [SECURITY.md](SECURITY.md).
-
-`Frontend/` and `ML/` at the repository root are older copies of the web app and forecast service from before the workspace layout. The live code is in `apps/web` and `services/forecast`.
+- Security notes: [SECURITY.md](docs/SECURITY.md).

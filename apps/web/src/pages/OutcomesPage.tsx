@@ -12,7 +12,7 @@ import { currencyOf, fanLines, payoffMarkers, underlyingLabel } from '../utils/r
 export function OutcomesPage({ run }: { run: SessionRun | null }) {
   if (!run) {
     return (
-      <Tile className="animate-journey-step">
+      <Tile>
         <Placeholder
           title="No result yet"
           reason="Run a simulation in stage 3. Payoffs, scenarios and the forecast fan come from the backend."
@@ -26,14 +26,14 @@ export function OutcomesPage({ run }: { run: SessionRun | null }) {
   const label = underlyingLabel(run);
 
   return (
-    <div className="space-y-5 animate-journey-step">
-      <Tile>
+    <div className="space-y-5">
+      <Tile className="reveal-up">
         <SectionHeader kicker={`${run.id} · ${run.product}`} title="Result" />
         <RunSummary run={run} />
       </Tile>
 
       {/* Same kind of table in both modes: payoff if the underlying ends at each shock from the start. */}
-      <Tile>
+      <Tile className="reveal-up [--i:1]">
         <SectionHeader
           kicker="Payoff at maturity"
           title={`Return across ${label} moves`}
@@ -54,14 +54,19 @@ export function OutcomesPage({ run }: { run: SessionRun | null }) {
           axisLabel={label}
         />
       </Tile>
-      <Tile>
+      <Tile className="reveal-up [--i:2]">
         <SectionHeader kicker="PRD scenario comparison" title="Payoff at −25%, −10%, 0% and +15%" />
-        <ScenarioTable scenarios={r.scenarios} currency={ccy} levelLabel={`${label} level`} />
+        <ScenarioTable
+          scenarios={r.scenarios}
+          currency={ccy}
+          levelLabel={`${label} level`}
+          payoffLabel={run.product === 'DCD' ? `Payoff (${ccy} equivalent)` : undefined}
+        />
       </Tile>
 
       {r.mode === 'A' && (
         <>
-          <Tile>
+          <Tile className="reveal-up [--i:3]">
             <SectionHeader
               kicker="Mode A forecast"
               title={`${label}: 5th–95th percentile range`}
@@ -84,11 +89,11 @@ export function OutcomesPage({ run }: { run: SessionRun | null }) {
             />
           </Tile>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <Tile>
+            <Tile className="reveal-up [--i:4]">
               <SectionHeader kicker="Risk panel" title="Low, base and high cases" />
               <RiskPanel response={r} currency={ccy} />
             </Tile>
-            <Tile>
+            <Tile className="reveal-up [--i:4]">
               <SectionHeader kicker="Model card" title="How the forecast was made" />
               <ModelCard model={r.model} backtest={r.backtest} />
             </Tile>

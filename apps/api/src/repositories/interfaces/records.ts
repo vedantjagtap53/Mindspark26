@@ -1,4 +1,4 @@
-// Domain records for persistence (DATABASE_SCHEMA.md). These use the application's vocabulary
+// Domain records for persistence (docs/DATABASE_SCHEMA.md). These use the application's vocabulary
 // ('live', 'Caution', 'low'); the database adapter maps them to its own enums and formats.
 // Percent fields are percent numbers; probabilities are fractions. Timestamps are ISO strings.
 
@@ -7,6 +7,7 @@ import type {
   ForecastCase,
   LevelSource,
   ProductType,
+  RunOwner,
   SimulationMode,
   SuitabilityVerdict,
 } from '@mindspark/shared';
@@ -68,6 +69,8 @@ export interface RiskResultRecord extends RiskResultInput {
 
 interface SimulationInputBase {
   configurationId: string;
+  /** The account that ran it; null for a run made without signing in (development). */
+  userId: string | null;
   /** The client as entered at simulation time; the audit record. */
   profileSnapshot: ClientProfileSnapshot | null;
   riskResults: RiskResultInput[];
@@ -131,6 +134,8 @@ export interface ExplanationRecord extends Omit<ExplanationInput, 'simulationId'
 interface SimulationRecordExtra {
   id: string;
   createdAt: string;
+  /** The account behind `userId`; null when there is none (or for rows saved before accounts). */
+  owner: RunOwner | null;
   configuration: ProductConfigurationRecord;
   riskResults: RiskResultRecord[];
   suitability: SuitabilityResultRecord | null;

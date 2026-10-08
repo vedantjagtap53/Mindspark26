@@ -46,7 +46,7 @@ Errors: `{ "error": { "code", "message" } }` with `401 UNAUTHORIZED`, `422 INVAL
 
 ## Behaviour
 
-- Only `^NSEI` (`assetClass: "index"`). Tenor 30–1,095 days, training window 5 or 10 years, `samplePathCount` 100–2,000 (default 500). Unknown fields and loosely typed values (e.g. `"182"`) are rejected.
+- Only `^NSEI` (`assetClass: "index"`). Tenor 30–1,095 days, training window 30/365 to 3 years (default 3), `samplePathCount` 100–2,000 (default 500). Unknown fields and loosely typed values (e.g. `"182"`) are rejected.
 - GARCH(1,1) with Student-t errors, 10,000 paths, fixed drift 0.03% per trading day (`model.drift.method = "fixed"`, `annualized = 0.0756`). Fixed seed: the same data and request give the same output.
 - `backtest` is the row of `data/backtest_results.json` closest to the requested horizon; `horizonTradingDays` says which one. `windows` is the number of (overlapping) backtest origins.
 - Data is `data/nifty50_clean.csv`. It is re-read automatically when the file changes. Requests fail with `DATA_STALE` when the last close is more than 5 days old (same limit as the backend).
@@ -79,6 +79,7 @@ Schedule it after the close on trading days, for example at 16:30 IST:
 
 - Linux/macOS cron: `30 16 * * 1-5 cd /path/to/services/forecast && python -m forecast_service.refresh >> refresh.log 2>&1` (cron uses the server's time zone).
 - Windows Task Scheduler: a daily task at 16:30 that runs `python -m forecast_service.refresh` with `services/forecast` as the start folder.
+- From the repo root, `npm run dev:forecast` refreshes at start and every 6 hours while the service runs (`FORECAST_AUTO_REFRESH=off` disables it, `REFRESH_INTERVAL_HOURS` sets the interval), and `npm run refresh:forecast` runs it once. A failed run is logged and retried; it never stops the service.
 
 If a run fails, or no job runs for more than 5 days, forecasts fail with `DATA_STALE` and `/v1/health` reports `stale`. The service never forecasts on old data.
 

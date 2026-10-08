@@ -1,6 +1,6 @@
 // Journey tests with a stubbed API. The stub stands in for the backend in tests only.
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   PAYOFF_CURVE_SHOCKS,
   SCENARIO_SHOCKS,
@@ -10,6 +10,7 @@ import {
   type SuitabilityResponse,
 } from '@mindspark/shared';
 import { App } from '../src/App';
+import { preloadLanding } from '../src/pages/LandingPage';
 
 const outcome = (shockPct: number): ShockOutcome => ({
   shockPct,
@@ -136,14 +137,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+// The landing page loads on demand in the app; load it once up front so these journeys can start from
+// its button without waiting.
+beforeAll(preloadLanding);
+
 /** The app opens on the landing page; every journey starts from its button. */
-function renderApp(clientName: string | null = 'Asha Rao') {
+function renderApp() {
   render(<App />);
   fireEvent.click(screen.getAllByRole('button', { name: /Start New Mandate/ })[0]!);
-  // A run needs the client's name; pass null to leave it empty.
-  if (clientName !== null) {
-    fireEvent.change(screen.getByLabelText('Client name'), { target: { value: clientName } });
-  }
 }
 
 const goToSimulate = () => fireEvent.click(screen.getByRole('button', { name: /3\. Simulate/ }));
@@ -201,8 +202,6 @@ describe('Payoff Desk journey', () => {
         {
           simulationId: 'sim-1',
           profile: {
-            name: 'Asha Rao',
-            age: 30,
             riskAppetite: 'medium',
             horizonMonths: 12,
             lossTolerancePct: 10,
@@ -241,39 +240,27 @@ describe('Payoff Desk journey', () => {
     });
   });
 
-  it('sends the name and age the RM typed with the verdict request', async () => {
+  it('asks for no client name or age, and sends none with the verdict request', async () => {
     const { bodies } = backend();
-    renderApp('  Ravi Menon ');
-    fireEvent.change(screen.getByLabelText('Client age'), { target: { value: '61' } });
+    renderApp();
+    expect(screen.queryByLabelText('Client name')).toBeNull();
+    expect(screen.queryByLabelText('Client age')).toBeNull();
     await runModeB();
-    await waitFor(() =>
-      expect(bodies['/api/suitability']).toMatchObject([
-        { profile: { name: 'Ravi Menon', age: 61 } },
-      ]),
-    );
+    await waitFor(() => expect(bodies['/api/suitability']).toHaveLength(1));
+    const sent = bodies['/api/suitability']![0] as { profile: Record<string, unknown> };
+    expect(Object.keys(sent.profile).sort()).toEqual([
+      'concentrationPct',
+      'horizonMonths',
+      'lossTolerancePct',
+      'riskAppetite',
+    ]);
   });
 
-  it('holds the run until the client name and age are entered', () => {
+  it('lets the RM run as soon as the product terms and level are in', () => {
     backend();
-    renderApp(null);
+    renderApp();
     goToSimulate();
     fireEvent.change(screen.getByLabelText(/Starting level \(S/), { target: { value: '25000' } });
-    const run = screen.getByRole<HTMLButtonElement>('button', { name: /Run simulation/ });
-    expect(run.disabled).toBe(true);
-    expect(screen.getByText('Enter the client name.')).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('button', { name: /1\. Mandate/ }));
-    fireEvent.change(screen.getByLabelText('Client name'), { target: { value: 'Asha Rao' } });
-    fireEvent.change(screen.getByLabelText('Client age'), { target: { value: '' } });
-    goToSimulate();
-    expect(screen.getByText('Enter the client age.')).toBeTruthy();
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: /Run simulation/ }).disabled).toBe(
-      true,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /1\. Mandate/ }));
-    fireEvent.change(screen.getByLabelText('Client age'), { target: { value: '45' } });
-    goToSimulate();
     expect(screen.getByRole<HTMLButtonElement>('button', { name: /Run simulation/ }).disabled).toBe(
       false,
     );
@@ -374,8 +361,50 @@ describe('Payoff Desk journey', () => {
     expect(screen.getByLabelText(/Starting level \(S/)).toBeTruthy();
   });
 
-  it('offers Mode A for DCD and sends the FX terms to the backend', async () => {
-    const { bodies } = backend();
+  it('DCD in Mode A shows the Nifty 50 forecast as context only, with no payoff or verdict', async () => {
+    const context = {
+      kind: 'forecast_context',
+      mode: 'A',
+      productType: 'DCD',
+      underlying: { symbol: '^NSEI', name: 'Nifty 50' },
+      spot: { value: 25_000, asOf: '2026-10-01' },
+      horizon: { tenorDays: 90, tradingDays: 62 },
+      fan: {
+        p5: [25_000, 24_000, 23_000],
+        p50: [25_000, 25_100, 25_200],
+        p95: [25_000, 26_000, 27_000],
+      },
+      model: {
+        name: 'garch11-t-montecarlo',
+        version: '1.0.1',
+        simulations: 10_000,
+        drift: { method: 'fixed', annualized: 0.0756 },
+        trainingWindowYears: 10,
+        trainingStart: '2016-10-03',
+        trainingEnd: '2026-10-01',
+        observations: 2_480,
+      },
+      backtest: {
+        horizonTradingDays: 62,
+        windows: 30,
+        bandCoverage: 0.88,
+        baseMape: 0.05,
+        naiveMape: 0.06,
+      },
+      history: { status: 'unavailable', reason: 'No price history provider is configured' },
+      notice:
+        'Nifty 50 forecast, shown for context only. Use Mode B (FX shock) for the DCD payoff.',
+    };
+    const urls: string[] = [];
+    const simulateBodies: unknown[] = [];
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+      urls.push(url);
+      if (url === '/api/simulate') {
+        simulateBodies.push(JSON.parse(init?.body as string));
+        return json(200, context);
+      }
+      return json(404, { error: { code: 'NOT_FOUND', message: 'unexpected call' } });
+    });
     renderApp();
     // The product cards are on the Structure stage.
     fireEvent.click(screen.getByRole('button', { name: /2\. Structure/ }));
@@ -384,12 +413,72 @@ describe('Payoff Desk journey', () => {
     const modeA = screen.getByRole<HTMLButtonElement>('radio', { name: /Mode A/ });
     expect(modeA.disabled).toBe(false);
     fireEvent.click(modeA);
+    expect(screen.getByText(/shows its Nifty 50 forecast as context only/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Run simulation/ }));
-    await waitFor(() => expect(bodies['/api/simulate']).toHaveLength(1));
-    expect(bodies['/api/simulate']![0]).toMatchObject({
-      mode: 'A',
-      productType: 'DCD',
-      terms: { depositCurrency: 'USD', alternateCurrency: 'INR' },
-    });
+
+    expect(await screen.findByText('Nifty 50: 5th–95th percentile range')).toBeTruthy();
+    expect(screen.getByText('Mode A forecast · context only')).toBeTruthy();
+    expect(screen.getByRole('note').textContent).toMatch(/context only/);
+    expect(screen.getByText('How the forecast was made')).toBeTruthy();
+    expect(simulateBodies).toMatchObject([
+      { mode: 'A', productType: 'DCD', terms: { depositCurrency: 'USD' } },
+    ]);
+
+    // Not a run: no verdict is requested, nothing is listed in the session, no payoff is shown.
+    expect(urls).toEqual(['/api/simulate']);
+    expect(screen.queryByText(/Latest run/)).toBeNull();
+    expect(screen.queryByText('Result')).toBeNull();
+
+    // The forecast belongs to these inputs: changing the product and coming back must not show it.
+    fireEvent.click(screen.getByRole('button', { name: /2\. Structure/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /ELN/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /DCD/ }));
+    goToSimulate();
+    expect(screen.queryByText('Mode A forecast · context only')).toBeNull();
+    fireEvent.click(screen.getByRole('radio', { name: /Mode A/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Run simulation/ }));
+    expect(await screen.findByText('Mode A forecast · context only')).toBeTruthy();
+
+    // The note offers the way to the DCD payoff.
+    fireEvent.click(screen.getByRole('button', { name: /Switch to Mode B for the DCD payoff/ }));
+    expect(screen.getByRole('radio', { name: /Mode B/ }).getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('keeps the Nifty 50 context off the screen for other products', () => {
+    renderApp();
+    goToSimulate();
+    fireEvent.click(screen.getByRole('radio', { name: /Mode A/ }));
+    expect(screen.queryByText(/shows its Nifty 50 forecast as context only/)).toBeNull();
+    expect(screen.queryByText('Mode A forecast · context only')).toBeNull();
+  });
+});
+
+describe('comparing runs', () => {
+  it('puts two runs from this session side by side with their backend verdicts', async () => {
+    const { fetchMock } = backend();
+    renderApp();
+    await runModeB();
+    fireEvent.click(screen.getByRole('button', { name: /Run simulation/ }));
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.filter(([u]) => u === '/api/suitability')).toHaveLength(2),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Runs/ }));
+    const compare = await screen.findByRole('button', { name: /Compare \(0\)/ });
+    expect((compare as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Compare run-1' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Compare run-2' }));
+    const callsBefore = fetchMock.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: /Compare \(2\)/ }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Compare 2 runs' });
+    const table = within(dialog).getByRole('table', { name: 'Selected runs side by side' });
+    expect(within(table).getAllByText('₹10,47,500')).toHaveLength(2);
+    expect(within(table).getAllByText('Caution')).toHaveLength(2);
+    // Same client, same mode, same shock: nothing to warn about, and nothing ranked.
+    expect(within(dialog).queryByText(/different client profiles/)).toBeNull();
+    expect(within(dialog).getByText(/does not rank the products or recommend one/)).toBeTruthy();
+    // Comparing reads what the backend already returned: no new request.
+    expect(fetchMock.mock.calls.length).toBe(callsBefore);
   });
 });

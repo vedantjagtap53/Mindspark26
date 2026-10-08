@@ -21,13 +21,14 @@ export const suitabilityProfileSchema = z.strictObject({
 export type SuitabilityProfile = z.output<typeof suitabilityProfileSchema>;
 
 /**
- * The client as the RM enters it (decided 2026-10-04: no saved profiles). Name and age are
- * display-only: they appear on screen and in the memo and are stored with the audit record, but
- * no suitability rule reads them and they are never sent to the AI service.
+ * The client as the RM enters it (decided 2026-10-04: no saved profiles). Since 2026-10-08 the
+ * desk no longer asks for a client name or age (the RM signs in instead), so both are optional:
+ * a caller that still sends them is accepted, and older audit records that hold them stay valid.
+ * They are display-only: no suitability rule reads them and they are never sent to the AI service.
  */
 export const clientProfileSchema = suitabilityProfileSchema.extend({
-  name: z.string().trim().min(1).max(120),
-  age: z.number().int().min(18).max(120),
+  name: z.string().trim().min(1).max(120).optional(),
+  age: z.number().int().min(18).max(120).optional(),
 });
 export type ClientProfile = z.output<typeof clientProfileSchema>;
 
