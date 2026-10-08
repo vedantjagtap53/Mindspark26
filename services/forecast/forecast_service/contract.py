@@ -10,7 +10,10 @@ CONTRACT_VERSION = "1.0"
 MODEL_NAME = "garch11-t-montecarlo"
 MODEL_VERSION = "1.0.1"          # 1.0.1: one-step-ahead variance fix in model.fit_garch
 SUPPORTED_UNDERLYINGS = {"^NSEI": "index"}
-TRAINING_WINDOWS = (5, 10)
+# Training window chosen by the RM (PRD.md §7.1, §7.3): 30 days to 3 years, sent as years.
+TRAINING_WINDOW_MIN_YEARS = 30 / 365
+TRAINING_WINDOW_MAX_YEARS = 1095 / 365
+DEFAULT_TRAINING_WINDOW_YEARS = TRAINING_WINDOW_MAX_YEARS
 
 
 def trading_days(tenor_days):

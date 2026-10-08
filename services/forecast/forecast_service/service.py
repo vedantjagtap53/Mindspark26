@@ -8,8 +8,9 @@ import pandas as pd
 
 from . import model as nm
 from .config import load_settings
-from .contract import (CONTRACT_VERSION, MODEL_NAME, MODEL_VERSION, SUPPORTED_UNDERLYINGS,
-                       TRAINING_WINDOWS, trading_days)
+from .contract import (CONTRACT_VERSION, DEFAULT_TRAINING_WINDOW_YEARS, MODEL_NAME, MODEL_VERSION,
+                       SUPPORTED_UNDERLYINGS, TRAINING_WINDOW_MAX_YEARS, TRAINING_WINDOW_MIN_YEARS,
+                       trading_days)
 
 
 class ApiError(Exception):
@@ -51,7 +52,9 @@ class ForecastService:
     def _fit(self, window_years):
         key = (self.as_of, window_years)
         if key not in self._fits:
-            d = self.df[self.df.Date >= self.df.Date.max() - pd.DateOffset(years=window_years)]
+            # The window is a number of calendar days (30 to 1,095), so it can be fractional years.
+            days = round(window_years * 365)
+            d = self.df[self.df.Date >= self.df.Date.max() - pd.Timedelta(days=days)]
             lr = (np.log(d.Close).diff().dropna() * 100).values
             try:
                 p = nm.fit_garch(lr)
@@ -73,14 +76,17 @@ class ForecastService:
                     baseMape=round(row["baseMapePct"] / 100, 6), naiveMape=round(row["naiveMapePct"] / 100, 6))
 
     # ---- endpoints ----
-    def forecast(self, symbol, asset_class, tenor_days, training_window_years=10, sample_path_count=500):
+    def forecast(self, symbol, asset_class, tenor_days, training_window_years=DEFAULT_TRAINING_WINDOW_YEARS,
+                 sample_path_count=500):
         c = self.cfg
         if SUPPORTED_UNDERLYINGS.get(symbol) != asset_class:
             raise ApiError(400, "UNSUPPORTED_UNDERLYING", f"Underlying {symbol!r} ({asset_class}) is not supported")
         if not (c["min_tenor"] <= tenor_days <= c["max_tenor"]):
             raise ApiError(422, "INVALID_REQUEST", f"tenorDays must be between {c['min_tenor']} and {c['max_tenor']}")
-        if training_window_years not in TRAINING_WINDOWS:
-            raise ApiError(422, "INVALID_REQUEST", "trainingWindowYears must be 5 or 10")
+        if (isinstance(training_window_years, bool) or not isinstance(training_window_years, (int, float))
+                or not (TRAINING_WINDOW_MIN_YEARS <= training_window_years <= TRAINING_WINDOW_MAX_YEARS)):
+            raise ApiError(422, "INVALID_REQUEST",
+                           "trainingWindowYears must be between 30/365 (30 days) and 3 (1,095 days)")
         if not (c["min_samples"] <= sample_path_count <= c["max_samples"]):
             raise ApiError(422, "INVALID_REQUEST", f"samplePathCount must be between {c['min_samples']} and {c['max_samples']}")
         self._reload_if_changed()
