@@ -5,6 +5,8 @@ import { ArrowRight, Columns3, History, Printer, X } from 'lucide-react';
 import type { SessionRun } from '../types/session';
 import { formatMoney, formatPct } from '../utils/format';
 import { currencyOf, investedOf, modeLabel, underlyingLabel } from '../utils/run';
+import { revealStyle } from '../motion/reveal';
+import { ModalBackdrop, ModalPanel } from './ModalMotion';
 import { SavedRunsPanel } from './runs/SavedRunsPanel';
 import { COMPARE_MAX, COMPARE_MIN } from './simulation/CompareRuns';
 import { RunSummary } from './simulation/RunSummary';
@@ -58,17 +60,17 @@ export function SessionRunsModal({
   }, [onClose]);
 
   return (
-    <div
+    <ModalBackdrop
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
       className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 no-print"
     >
-      <div
+      <ModalPanel
         role="dialog"
         aria-modal="true"
         aria-labelledby="runs-title"
-        className="clay-tile text-[var(--ink-primary)] max-w-5xl w-full h-[85vh] rounded-3xl flex flex-col overflow-hidden border border-[var(--border-strong)] animate-modal-in"
+        className="clay-tile text-[var(--ink-primary)] max-w-5xl w-full h-[85vh] rounded-3xl flex flex-col overflow-hidden border border-[var(--border-strong)]"
       >
         <div className="h-14 border-b border-[var(--border-color)] bg-[var(--well-bg)] px-4 sm:px-6 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -134,11 +136,15 @@ export function SessionRunsModal({
                   No runs yet in this session.
                 </li>
               )}
-              {runs.map((r) => {
+              {runs.map((r, index) => {
                 const invested = investedOf(r);
                 const isPicked = picked.includes(r.id);
                 return (
-                  <li key={r.id} className="flex items-start gap-2">
+                  <li
+                    key={r.id}
+                    className="reveal-up flex items-start gap-2"
+                    style={revealStyle(index)}
+                  >
                     {runs.length >= COMPARE_MIN && (
                       <input
                         type="checkbox"
@@ -225,7 +231,7 @@ export function SessionRunsModal({
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </ModalPanel>
+    </ModalBackdrop>
   );
 }

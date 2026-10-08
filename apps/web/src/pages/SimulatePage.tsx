@@ -24,7 +24,7 @@ interface Props {
 
 export function SimulatePage({ latest, context, onUseModeB, ...picker }: Props) {
   return (
-    <div className="space-y-5 animate-journey-step">
+    <div className="space-y-5">
       <ModePicker {...picker} />
       {context && <ForecastContextPanel context={context} onUseModeB={onUseModeB} />}
       {latest && (

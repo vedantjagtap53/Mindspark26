@@ -1,4 +1,4 @@
-// The RM journey in a real browser against the real API (TESTING_STRATEGY.md "E2E"): dashboard →
+// The RM journey in a real browser against the real API (docs/TESTING_STRATEGY.md "E2E"): dashboard →
 // product → terms → client profile → mode → results → suitability → explanation → chat.
 import { expect, test, type Page } from '@playwright/test';
 

@@ -1,6 +1,6 @@
 // Journey tests with a stubbed API. The stub stands in for the backend in tests only.
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   PAYOFF_CURVE_SHOCKS,
   SCENARIO_SHOCKS,
@@ -10,6 +10,7 @@ import {
   type SuitabilityResponse,
 } from '@mindspark/shared';
 import { App } from '../src/App';
+import { preloadLanding } from '../src/pages/LandingPage';
 
 const outcome = (shockPct: number): ShockOutcome => ({
   shockPct,
@@ -135,6 +136,10 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
+
+// The landing page loads on demand in the app; load it once up front so these journeys can start from
+// its button without waiting.
+beforeAll(preloadLanding);
 
 /** The app opens on the landing page; every journey starts from its button. */
 function renderApp() {

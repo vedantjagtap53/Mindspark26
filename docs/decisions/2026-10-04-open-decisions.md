@@ -53,5 +53,5 @@ The database moved from Firebase SQL Connect to Supabase on 2026-10-04 (approved
    - `/api/suitability`'s response has `persisted` (additive).
    - Saved client profiles were removed later the same day (see `IMPLEMENTATION_STATUS.md`). The client's name and age are stored in the audit snapshot; Karan confirmed the whole-number age limits (18–120) on 2026-10-04.
    - A database outage returns `DATABASE_ERROR` with HTTP 500 (the existing mapping); 503 may suit an outage better.
-   - Root `Frontend/` and `ML/` look like pre-workspace copies of `apps/web` and `services/forecast`. They are now excluded from lint; delete them if no longer needed.
+   - Root `Frontend/` and `ML/` look like pre-workspace copies of `apps/web` and `services/forecast`. They are now excluded from lint; delete them if no longer needed. **Resolved 2026-10-08:** Karan approved removing them, together with `payoff-ai-v3/` (an exact copy of `services/rag`).
    - `npm audit`: clean since the database SDK change (the 2 moderate issues came from the removed Firebase SDK).

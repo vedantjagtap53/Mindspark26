@@ -54,6 +54,9 @@ const envSchema = z
     AI_API_URL: optional(z.url()),
     AI_API_KEY: optional(z.string()),
     AI_FORECAST_TIMEOUT_MS: unsetIfEmpty(z.coerce.number().int().positive().default(15_000)),
+    // Reuse a forecast for an identical request this long (in memory; 0 turns it off). The service
+    // has a fixed random seed, so this changes no result, only the wait.
+    AI_FORECAST_CACHE_SECONDS: unsetIfEmpty(z.coerce.number().int().min(0).max(3600).default(900)),
     // Explanation and chat service (services/rag). RAG_API_KEY is sent as X-API-Key and must
     // equal that service's SERVICE_API_KEY.
     RAG_API_URL: optional(z.url()),
@@ -76,6 +79,8 @@ const envSchema = z
     // Daily FX reference rates (Frankfurter). Slack covers weekends and holidays.
     FX_API_URL: unsetIfEmpty(z.url().default('https://api.frankfurter.dev')),
     FX_RATE_MAX_AGE_DAYS: unsetIfEmpty(z.coerce.number().int().positive().default(4)),
+    // Reuse a pair's rate this long (in memory; 0 turns it off). It is an end-of-day rate.
+    FX_RATE_CACHE_SECONDS: unsetIfEmpty(z.coerce.number().int().min(0).max(86_400).default(3600)),
     // Daily closes for the Mode A fan chart. Off by default: Yahoo Finance is free and keyless
     // but unofficial (no SLA; its terms apply).
     MARKET_HISTORY_PROVIDER: unsetIfEmpty(z.enum(['none', 'yahoo']).default('none')),

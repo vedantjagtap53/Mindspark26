@@ -1,3 +1,39 @@
+# Allowlist: everything is ignored unless listed below.
+*
+
+# Root files
+!.gitignore
+!.env.example
+!.prettierignore
+!.prettierrc.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsconfig.base.json
+!eslint.config.js
+!README.md
+!CLAUDE.md
+!PRD.md
+!IMPLEMENTATION_STATUS.md
+
+# Source and project folders
+!apps/
+!apps/**
+!packages/
+!packages/**
+!services/
+!services/**
+!supabase/
+!supabase/**
+!docs/
+!docs/**
+!scripts/
+!scripts/**
+!tests/
+!tests/**
+
+# Never upload, even inside the folders above
+
 # Dependencies
 node_modules/
 
@@ -10,6 +46,7 @@ build/
 coverage/
 playwright-report/
 test-results/
+*.tsbuildinfo
 
 # Local environment files and secrets (keep safe-to-share templates)
 .env
@@ -21,7 +58,7 @@ test-results/
 *.pfx
 serviceAccountKey.json
 
-# Supabase CLI local state (supabase/.gitignore covers it too)
+# Supabase CLI local state
 supabase/.temp/
 supabase/.branches/
 

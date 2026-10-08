@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { ArrowLeft, ArrowRight, Printer } from 'lucide-react';
 import { STAGES, type Stage } from './TopNav';
 
@@ -21,6 +22,17 @@ export function StageHeader({ stage, onStage, onPrint }: Props) {
   const next = STAGES[index + 1];
   const copy = COPY[stage];
 
+  // After the user moves to another stage, focus lands on that stage's heading so keyboard and
+  // screen-reader users start at the top of the new content. Comparing with the previous stage (not a
+  // "first run" flag) keeps React strict mode's double effect from stealing focus on first load.
+  const heading = useRef<HTMLHeadingElement>(null);
+  const shown = useRef(stage);
+  useEffect(() => {
+    if (shown.current === stage) return;
+    shown.current = stage;
+    heading.current?.focus({ preventScroll: true });
+  }, [stage]);
+
   return (
     <div className="clay-tile p-3 sm:p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
       <div className="flex items-center gap-3">
@@ -31,7 +43,11 @@ export function StageHeader({ stage, onStage, onPrint }: Props) {
           <span className="text-xs font-mono uppercase tracking-wider text-[var(--ink-muted)] font-semibold">
             Stage {index + 1} of {STAGES.length} · {copy.kicker}
           </span>
-          <h1 className="font-serif text-lg sm:text-xl font-bold text-[var(--ink-primary)] tracking-tight">
+          <h1
+            ref={heading}
+            tabIndex={-1}
+            className="font-serif text-lg sm:text-xl font-bold text-[var(--ink-primary)] tracking-tight focus:outline-none"
+          >
             {copy.title}
           </h1>
         </div>

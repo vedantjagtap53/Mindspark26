@@ -21,9 +21,14 @@ export const JSON_BODY_LIMIT = '1mb';
 
 /** Forecast client for Mode A, or `undefined` when AI_API_URL is not set. */
 function forecastClientFromConfig(config: AppConfig): ForecastClient | undefined {
-  const { baseUrl, apiKey, forecastTimeoutMs } = config.ai;
+  const { baseUrl, apiKey, forecastTimeoutMs, forecastCacheMs } = config.ai;
   return baseUrl
-    ? createForecastClient({ baseUrl, apiKey: apiKey ?? '', timeoutMs: forecastTimeoutMs })
+    ? createForecastClient({
+        baseUrl,
+        apiKey: apiKey ?? '',
+        timeoutMs: forecastTimeoutMs,
+        cacheMs: forecastCacheMs,
+      })
     : undefined;
 }
 

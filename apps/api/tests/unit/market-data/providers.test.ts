@@ -92,6 +92,29 @@ describe('Frankfurter provider', () => {
     expect(calls).toEqual(['https://fx.example/v2/rate/usd/inr']);
   });
 
+  it('reuses a pair’s rate instead of asking again, and never keeps a failure', async () => {
+    calls.length = 0;
+    const fx = provider(respond(body));
+    await fx.getRate('USD', 'INR');
+    expect(await fx.getRate('usd', 'inr')).toEqual({
+      value: 96.15,
+      source: 'reference',
+      asOf: '2026-10-02',
+    });
+    expect(calls).toHaveLength(1);
+
+    calls.length = 0;
+    let status = 503;
+    const flaky = provider(((url: string) => {
+      calls.push(url);
+      return Promise.resolve(new Response(JSON.stringify(body), { status }));
+    }) as unknown as typeof fetch);
+    await expect(flaky.getRate('USD', 'INR')).rejects.toThrow(/HTTP 503/);
+    status = 200;
+    await expect(flaky.getRate('USD', 'INR')).resolves.toBeDefined();
+    expect(calls).toHaveLength(2);
+  });
+
   it('accepts a weekend-old rate within the age limit', async () => {
     await expect(
       provider(respond({ ...body, date: '2026-10-02' })).getRate('USD', 'INR'),

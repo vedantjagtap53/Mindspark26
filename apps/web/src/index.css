@@ -106,6 +106,17 @@
     inset -1.5px -1.5px 3px rgba(255, 255, 255, 0.04);
 }
 
+/* Motion tokens (mirrored in src/motion/tokens.ts; tests/motion/tokens.test.ts keeps them in step). */
+:root {
+  --motion-fast: 120ms;
+  --motion-base: 220ms;
+  --motion-slow: 450ms;
+  --motion-scene: 900ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --stagger: 60ms;
+}
+
 /* Hide the system cursor only while the custom cursor is actually running (it sets
    data-cursor-live); without it, or with the setting off, the normal pointer is used. */
 @media (pointer: fine) {
@@ -149,10 +160,10 @@ body {
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-clay);
   transition:
-    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 0.2s ease,
-    background 0.2s ease;
+    transform var(--motion-base) var(--ease-out),
+    box-shadow var(--motion-base) var(--ease-out),
+    border-color var(--motion-base) ease,
+    background var(--motion-base) ease;
   position: relative;
 }
 
@@ -168,13 +179,24 @@ body {
   border-radius: 20px;
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-clay);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    transform var(--motion-base) var(--ease-out),
+    box-shadow var(--motion-base) var(--ease-out),
+    border-color var(--motion-base) ease;
 }
 
-.clay-tile-interactive:hover {
-  transform: translateY(-2px);
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-interactive);
+/* Lifts and hover shadows are for real pointers only; on touch screens they would stick after a tap. */
+@media (hover: hover) and (pointer: fine) {
+  .clay-tile-interactive:hover {
+    transform: translateY(-2px);
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-interactive);
+  }
+}
+
+.clay-tile-interactive:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
 }
 
 /* Clay Inset Wells for Inputs, Selects, and Readouts */
@@ -186,7 +208,10 @@ body {
   box-shadow:
     inset 2.5px 2.5px 5px rgba(0, 0, 0, 0.08),
     inset -1.5px -1.5px 3px rgba(255, 255, 255, 0.6);
-  transition: all 0.18s ease;
+  transition:
+    background var(--motion-base) ease,
+    border-color var(--motion-base) ease,
+    box-shadow var(--motion-base) ease;
 }
 
 .clay-inset:focus-within {
@@ -206,20 +231,33 @@ body {
   box-shadow:
     0 6px 16px rgba(15, 23, 42, 0.25),
     inset 0 1px 2px rgba(255, 255, 255, 0.35);
-  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    transform var(--motion-fast) var(--ease-out),
+    box-shadow var(--motion-fast) var(--ease-out),
+    background var(--motion-base) ease;
 }
 
-.clay-btn-primary:hover {
-  background: var(--accent-hover);
-  transform: translateY(-1.5px);
-  box-shadow:
-    0 8px 22px rgba(15, 23, 42, 0.35),
-    inset 0 1px 2px rgba(255, 255, 255, 0.45);
+@media (hover: hover) and (pointer: fine) {
+  .clay-btn-primary:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1.5px);
+    box-shadow:
+      0 8px 22px rgba(15, 23, 42, 0.35),
+      inset 0 1px 2px rgba(255, 255, 255, 0.45);
+  }
 }
 
+/* Pressed looks the same for a mouse press and for Enter or Space on a focused button. */
 .clay-btn-primary:active {
   transform: scale(0.98) translateY(1px);
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+.clay-btn-primary:focus-visible,
+.clay-btn-secondary:focus-visible,
+.clay-press:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
 }
 
 .clay-btn-secondary {
@@ -230,19 +268,43 @@ body {
   box-shadow:
     0 3px 8px rgba(0, 0, 0, 0.06),
     inset 0 1px 1.5px rgba(255, 255, 255, 0.85);
-  transition: all 0.16s ease;
+  transition:
+    transform var(--motion-fast) var(--ease-out),
+    box-shadow var(--motion-fast) var(--ease-out),
+    background var(--motion-base) ease,
+    border-color var(--motion-base) ease;
 }
 
-.clay-btn-secondary:hover {
-  background: var(--card-bg-light);
-  border-color: var(--border-strong);
-  transform: translateY(-1.5px);
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+@media (hover: hover) and (pointer: fine) {
+  .clay-btn-secondary:hover {
+    background: var(--card-bg-light);
+    border-color: var(--border-strong);
+    transform: translateY(-1.5px);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+  }
 }
 
 .clay-btn-secondary:active {
   transform: scale(0.98);
   box-shadow: inset 0 1.5px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Press feedback for buttons that have their own look (landing page, menu items): a small squeeze on
+   press, with no lift. Works for a mouse press and for Enter or Space alike. */
+.clay-press {
+  transition:
+    transform var(--motion-fast) var(--ease-out),
+    filter var(--motion-base) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .clay-press:hover {
+    filter: brightness(1.08);
+  }
+}
+
+.clay-press:active {
+  transform: scale(0.97);
 }
 
 /* Clay Segmented Switcher Track */
@@ -293,7 +355,12 @@ body {
 
 /* Journey Stepper Classes */
 .step-node {
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    transform var(--motion-base) var(--ease-out),
+    background var(--motion-base) var(--ease-out),
+    color var(--motion-base) var(--ease-out),
+    border-color var(--motion-base) var(--ease-out),
+    box-shadow var(--motion-base) var(--ease-out);
 }
 
 .step-node-active {
@@ -366,6 +433,179 @@ body {
   }
 }
 
+/* Result entrances (Phase 3). Content is in the page from the first frame; these only fade or lift it
+   in. Set --i (0 to 8, see motion/reveal.ts) to stagger a group. `both` keeps the hidden state during
+   the delay and the shown state afterwards, so nothing is left invisible, and print and reduced
+   motion (rules at the end of this file) skip straight to the shown state. */
+@keyframes revealUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes revealFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes badgeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.reveal-up {
+  animation: revealUp var(--motion-slow) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * var(--stagger));
+}
+
+.reveal-fade {
+  animation: revealFade var(--motion-slow) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * var(--stagger));
+}
+
+/* Content that fades up when it scrolls into view (components/Reveal.tsx). It is in the page the
+   whole time; only the opacity starts at 0. Print never waits for a scroll. */
+.reveal-pending {
+  opacity: 0;
+}
+
+@media print {
+  .reveal-pending {
+    opacity: 1 !important;
+  }
+}
+
+/* The verdict badge: a brief settle, never a colour change; the colour is the verdict's own. */
+.badge-in {
+  animation: badgeIn var(--motion-base) var(--ease-out) both;
+}
+
+/* Ambient hero background (landing page, Phase 10). A still dotted pattern is what shows on touch
+   screens, narrow screens, with reduced motion and in print; on a desktop with a real pointer a canvas
+   grid replaces it (the component sets data-active). Fades out toward the middle, behind the headline. */
+.ambient-dots {
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--ink-muted) 55%, transparent) 1px,
+    transparent 1.6px
+  );
+  background-size: 28px 28px;
+  opacity: 0.3;
+  -webkit-mask-image: radial-gradient(ellipse 60% 70% at center, transparent 40%, #000 95%);
+  mask-image: radial-gradient(ellipse 60% 70% at center, transparent 40%, #000 95%);
+}
+
+.ambient[data-active='true'] .ambient-dots {
+  display: none;
+}
+
+@media print {
+  .ambient canvas {
+    display: none;
+  }
+  .ambient[data-active='true'] .ambient-dots {
+    display: block;
+  }
+}
+
+/* Marquee (landing page "Built to work with"): CSS only. The list is repeated once for a seamless
+   loop; it pauses off screen (data-running), on hover for real pointers, and becomes a static
+   wrapped list for reduced motion and print. */
+.marquee {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+}
+
+.marquee__track {
+  display: flex;
+  width: max-content;
+  animation: marquee 32s linear infinite;
+}
+
+.marquee[data-running='false'] .marquee__track {
+  animation-play-state: paused;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .marquee:hover .marquee__track {
+    animation-play-state: paused;
+  }
+}
+
+.marquee__list {
+  display: flex;
+  flex-shrink: 0;
+  gap: 3.5rem;
+  padding-right: 3.5rem;
+  margin: 0;
+  list-style: none;
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--ink-muted);
+}
+
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee__track {
+    animation: none;
+    width: auto;
+    justify-content: center;
+  }
+  .marquee__list {
+    flex-wrap: wrap;
+    justify-content: center;
+    padding-right: 0;
+  }
+  .marquee__repeat {
+    display: none;
+  }
+}
+
+@media print {
+  .marquee__track {
+    animation: none;
+    width: auto;
+  }
+  .marquee__repeat {
+    display: none;
+  }
+}
+
+/* Carousels (Swiper, phone widths only): use the app's colours, and leave room for the dots. */
+/* `.swiper.ms-carousel` (two classes) so this wins over Swiper's own `.swiper { padding: 0 }`,
+   which loads later with the carousel chunk. */
+.swiper.ms-carousel {
+  --swiper-theme-color: var(--accent-primary);
+  --swiper-pagination-bullet-inactive-color: var(--ink-muted);
+  --swiper-pagination-bullet-inactive-opacity: 0.4;
+  --swiper-pagination-bullet-size: 7px;
+  --swiper-pagination-bottom: 4px;
+  /* Swiper clips its slides, so leave room for the cards' shadows and for the dots underneath. */
+  padding: 6px 6px 38px;
+  margin: -6px -6px 0;
+}
+
 .animate-live-beacon {
   animation: liveBeacon 2.2s infinite;
 }
@@ -384,10 +624,27 @@ body {
   .animate-live-beacon {
     animation: none;
   }
+
+  /* Safety net for every other animation and transition: changes still happen, instantly. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Printing the memo: only the memo itself goes to paper. */
 @media print {
+  /* No motion on paper. */
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
   .no-print {
     display: none !important;
   }

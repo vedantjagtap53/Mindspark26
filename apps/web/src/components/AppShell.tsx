@@ -1,5 +1,6 @@
 // Frame for the pages that are not the simulator (admin console, compliance audit view).
 import type { ReactNode } from 'react';
+import { BRAND_NAME } from '../constants/brand';
 import { UserMenu } from './UserMenu';
 
 interface Props {
@@ -16,7 +17,7 @@ export function AppShell({ title, actions, children }: Props) {
         <div className="max-w-6xl mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center gap-3 justify-between">
           <div>
             <span className="font-serif text-lg font-bold text-[var(--ink-primary)]">
-              FinStrukt
+              {BRAND_NAME}
             </span>
             <span className="block text-[11px] font-mono text-[var(--ink-muted)]">{title}</span>
           </div>

@@ -11,7 +11,7 @@ interface Props {
 
 export function StructurePage({ product, onProduct, forms, onForms }: Props) {
   return (
-    <div className="space-y-5 animate-journey-step">
+    <div className="space-y-5">
       <ProductCards product={product} onProduct={onProduct} />
       <TermsEditor product={product} forms={forms} onForms={onForms} />
     </div>

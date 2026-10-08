@@ -1,6 +1,6 @@
 // The repository contract and the whole app against a real local Supabase. Skipped unless
 // SUPABASE_TEST_URL, SUPABASE_TEST_SERVICE_ROLE_KEY and SUPABASE_TEST_DB_URL are set (see
-// DATABASE_SCHEMA.md, "Testing against a local Supabase").
+// docs/DATABASE_SCHEMA.md, "Testing against a local Supabase").
 import pg from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
 import { buildConfig } from '../../src/config/index.js';

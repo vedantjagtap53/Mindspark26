@@ -265,7 +265,7 @@ export function ChatPanel({ run, onUpdate }: Props) {
             {messages.map((m, i) => (
               <div
                 key={i}
-                className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}
+                className={`reveal-up flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}
               >
                 <div
                   className={`max-w-[85%] rounded-xl p-2.5 text-xs leading-relaxed ${

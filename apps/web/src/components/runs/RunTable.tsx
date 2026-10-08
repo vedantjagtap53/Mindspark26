@@ -1,6 +1,7 @@
 // A table of saved runs. The same component shows a user their own runs and the admin everyone's
 // (`showUser`). Everything shown was computed and stored by the backend; nothing here is editable.
 import type { AuditSimulation, SuitabilityVerdict } from '@mindspark/shared';
+import { revealStyle } from '../../motion/reveal';
 
 const BADGE: Record<SuitabilityVerdict, string> = {
   Suitable: 'clay-badge-suitable',
@@ -73,10 +74,14 @@ export function RunTable({ rows, showUser = false, caption, onOpen }: Props) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => {
+          {rows.map((r, index) => {
             const head = headlineResult(r);
             return (
-              <tr key={r.id} className="border-t border-[var(--border-subtle)] align-top">
+              <tr
+                key={r.id}
+                className="reveal-fade border-t border-[var(--border-subtle)] align-top"
+                style={revealStyle(index)}
+              >
                 <td className="py-2 pr-3 font-mono text-[11px] text-[var(--ink-muted)]">
                   {new Date(r.createdAt).toLocaleString()}
                 </td>

@@ -1,4 +1,4 @@
-// Domain records for persistence (DATABASE_SCHEMA.md). These use the application's vocabulary
+// Domain records for persistence (docs/DATABASE_SCHEMA.md). These use the application's vocabulary
 // ('live', 'Caution', 'low'); the database adapter maps them to its own enums and formats.
 // Percent fields are percent numbers; probabilities are fractions. Timestamps are ISO strings.
 

@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from './auth/AuthContext';
 import { AppShell } from './components/AppShell';
 import { CustomCursor } from './components/CustomCursor';
 import { UserMenu } from './components/UserMenu';
+import { MotionProvider } from './motion';
 import { AdminConsole } from './pages/AdminConsole';
 import { AuthPage } from './pages/AuthPage';
 import { LandingPage } from './pages/LandingPage';
@@ -120,9 +121,11 @@ function Cursor() {
 
 export function AppRoot() {
   return (
-    <AuthProvider>
-      <Cursor />
-      <Router />
-    </AuthProvider>
+    <MotionProvider>
+      <AuthProvider>
+        <Cursor />
+        <Router />
+      </AuthProvider>
+    </MotionProvider>
   );
 }

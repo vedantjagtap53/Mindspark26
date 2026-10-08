@@ -143,7 +143,7 @@ Controller → Service → Repository interface → Supabase adapter
 
 ### Build steps
 
-1. [x] SQL migration in `supabase/migrations/` (final columns in `DATABASE_SCHEMA.md`, which supersedes the table above).
+1. [x] SQL migration in `supabase/migrations/` (final columns in `docs/DATABASE_SCHEMA.md`, which supersedes the table above).
 2. [x] `record_simulation` function for the atomic simulation write; audit tables append-only by trigger; RLS on with no policies.
 3. [x] Repository interfaces in `src/repositories/interfaces`, with a shared contract test suite (`tests/contract/repositoryContract.ts`).
 4. [x] Supabase adapter (`src/repositories/supabase`). Database unavailable → `DATABASE_ERROR`; not configured → `DATABASE_NOT_CONFIGURED`. No fallback.

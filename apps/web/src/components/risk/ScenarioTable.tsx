@@ -1,5 +1,6 @@
 // PRD §7.1 scenario comparison: −25%, −10%, 0%, +15% from the backend's `scenarios`.
 import type { ShockOutcome } from '@mindspark/shared';
+import { revealStyle } from '../../motion/reveal';
 import { formatLevel, formatMoney, formatPct, knockInLabel } from '../../utils/format';
 
 interface Props {
@@ -54,8 +55,12 @@ export function ScenarioTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-[var(--border-subtle)] font-mono">
-          {scenarios.map((s) => (
-            <tr key={s.shockPct} className="hover:bg-[var(--well-bg)]/50">
+          {scenarios.map((s, i) => (
+            <tr
+              key={s.shockPct}
+              className="reveal-fade hover:bg-[var(--well-bg)]/50"
+              style={revealStyle(i)}
+            >
               <th
                 scope="row"
                 className={`${cell} font-bold ${s.shockPct < 0 ? 'text-[var(--status-breach-text)]' : 'text-[var(--status-suitable-text)]'}`}

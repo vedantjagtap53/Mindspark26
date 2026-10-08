@@ -7,6 +7,7 @@ import { LogIn, UserPlus } from 'lucide-react';
 import { loginRequestSchema, registerRequestSchema } from '@mindspark/shared';
 import { ApiRequestError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { BRAND_NAME } from '../constants/brand';
 import { ErrorBlock } from '../components/ErrorBlock';
 import { UserMenu } from '../components/UserMenu';
 import { Field, Tile, TextInput } from '../components/ui';
@@ -72,7 +73,7 @@ export function AuthPage({
 
       <header className="relative z-20 px-6 py-4 border-b border-[var(--border-subtle)] bg-[var(--canvas-bg)]/80 backdrop-blur-md flex items-center justify-between">
         <span className="font-serif text-xl font-bold tracking-tight text-[var(--ink-primary)]">
-          FinStrukt
+          {BRAND_NAME}
         </span>
         <UserMenu />
       </header>

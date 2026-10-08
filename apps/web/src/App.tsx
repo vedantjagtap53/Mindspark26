@@ -1,10 +1,12 @@
 // Payoff Desk: the RM journey (PRD §7) in five stages. Every number comes from the backend API.
 import { useState, type ReactNode } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { ErrorBlock } from './components/ErrorBlock';
 import { PrintReport } from './components/PrintReport';
 import { SessionRunsModal } from './components/SessionRunsModal';
 import { CompareRuns } from './components/simulation/CompareRuns';
 import { StageHeader } from './components/StageHeader';
+import { StageTransition } from './components/StageTransition';
 import { TopNav, type Stage } from './components/TopNav';
 import { LandingPage } from './pages/LandingPage';
 import { useSimulation } from './hooks/useSimulation';
@@ -125,61 +127,68 @@ export function App({ userSlot, startOnDesk = false, savedRuns = false }: AppPro
           />
         )}
 
-        {stage === 'MANDATE' && (
-          <MandatePage product={product} profile={profile} onProfile={setProfile} run={current} />
-        )}
-        {stage === 'STRUCTURE' && (
-          <StructurePage
-            product={product}
-            onProduct={setProduct}
-            forms={forms}
-            onForms={changeForms}
-          />
-        )}
-        {stage === 'SIMULATE' && (
-          <SimulatePage
-            product={product}
-            symbol={product === 'DCD' ? '' : forms[product].symbol}
-            run={run}
-            onRun={changeRun}
-            termIssueCount={issueCount}
-            strikeRate={forms.DCD.strikeRate}
-            loading={sim.loading}
-            elapsedSeconds={sim.elapsedSeconds}
-            onExecute={execute}
-            latest={current}
-            context={product === 'DCD' ? sim.context : null}
-            onUseModeB={() => changeRun({ ...run, mode: 'B' })}
-          />
-        )}
-        {stage === 'OUTCOMES' && <OutcomesPage run={current} />}
-        {stage === 'VERDICT' && (
-          <VerdictPage
-            product={product}
-            profile={profile}
-            run={current}
-            onUpdateRun={sim.updateRun}
-          />
-        )}
+        <StageTransition stageKey={stage}>
+          {stage === 'MANDATE' && (
+            <MandatePage product={product} profile={profile} onProfile={setProfile} run={current} />
+          )}
+          {stage === 'STRUCTURE' && (
+            <StructurePage
+              product={product}
+              onProduct={setProduct}
+              forms={forms}
+              onForms={changeForms}
+            />
+          )}
+          {stage === 'SIMULATE' && (
+            <SimulatePage
+              product={product}
+              symbol={product === 'DCD' ? '' : forms[product].symbol}
+              run={run}
+              onRun={changeRun}
+              termIssueCount={issueCount}
+              strikeRate={forms.DCD.strikeRate}
+              loading={sim.loading}
+              elapsedSeconds={sim.elapsedSeconds}
+              onExecute={execute}
+              latest={current}
+              context={product === 'DCD' ? sim.context : null}
+              onUseModeB={() => changeRun({ ...run, mode: 'B' })}
+            />
+          )}
+          {stage === 'OUTCOMES' && <OutcomesPage run={current} />}
+          {stage === 'VERDICT' && (
+            <VerdictPage
+              product={product}
+              profile={profile}
+              run={current}
+              onUpdateRun={sim.updateRun}
+            />
+          )}
+        </StageTransition>
       </main>
 
-      {runsOpen && (
-        <SessionRunsModal
-          runs={sim.runs}
-          savedRuns={savedRuns}
-          onLoad={loadRun}
-          onPrint={(r) => {
-            setRunsOpen(false);
-            setPrintRun(r);
-          }}
-          onCompare={(rs) => {
-            setRunsOpen(false);
-            setCompareRuns(rs);
-          }}
-          onClose={() => setRunsOpen(false)}
-        />
-      )}
-      {compareRuns && <CompareRuns runs={compareRuns} onClose={() => setCompareRuns(null)} />}
+      <AnimatePresence>
+        {runsOpen && (
+          <SessionRunsModal
+            key="runs"
+            runs={sim.runs}
+            savedRuns={savedRuns}
+            onLoad={loadRun}
+            onPrint={(r) => {
+              setRunsOpen(false);
+              setPrintRun(r);
+            }}
+            onCompare={(rs) => {
+              setRunsOpen(false);
+              setCompareRuns(rs);
+            }}
+            onClose={() => setRunsOpen(false)}
+          />
+        )}
+        {compareRuns && (
+          <CompareRuns key="compare" runs={compareRuns} onClose={() => setCompareRuns(null)} />
+        )}
+      </AnimatePresence>
       {printRun && <PrintReport run={printRun} onClose={() => setPrintRun(null)} />}
     </div>
   );
